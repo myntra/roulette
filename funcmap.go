@@ -104,7 +104,7 @@ func set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...s
 	return ret
 }
 
-var funcMap = template.FuncMap{
+var defaultFuncMap = template.FuncMap{
 	// The name "title" is what the function will be called in the template text.
 	"rule":   rule,
 	"within": within,

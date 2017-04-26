@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"text/template"
 
 	"github.com/myntra/roulette"
 )
@@ -42,6 +43,12 @@ func main() {
 	c := Company{Name: "Myntra"}
 
 	parser := getParser("../../testrules/test_rule.xml")
+
+	// add custom functions
+	parser.AddFuncs(template.FuncMap{
+		"customFunc": customFunc,
+	})
+
 	// get only the top priority result
 	ruleResult, err := parser.ResultOne(p)
 	if err != nil {
@@ -74,6 +81,7 @@ func main() {
 		fmt.Println(ruleResult.Name(), ruleResult.BoolVal())
 	}
 
+	// use another type
 	ruleResult, err = parser.ResultOne(c)
 	if err != nil {
 		log.Fatal(err)
@@ -81,4 +89,11 @@ func main() {
 
 	fmt.Println(ruleResult.Name(), ruleResult.BoolVal())
 
+}
+
+// this function signature is required:
+// f(arg1,arg2, prevVal ...string)string
+func customFunc(val1 interface{}, val2 string, prevVal ...string) string {
+	fmt.Println("customFunc trigerred", val1, val2, prevVal)
+	return "true"
 }

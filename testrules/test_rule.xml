@@ -23,6 +23,12 @@
                     <r>gte .Experience 7 | within .Age 15 30 | lte .Vacations 5 | eql .Position "SSE" | set . "Age" 25 </r>
                 <r>end</r>
         </rule>
+
+        <rule name="customFunc" resultType="bool" priority="5">
+            <r>with .Person</r>
+                    <r>customFunc . "hello world"</r>
+            <r>end</r>
+        </rule>
     </rules>
 
     <rules type="Company">

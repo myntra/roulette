@@ -8,6 +8,7 @@ import (
 	"log"
 	"reflect"
 	"sort"
+	"strings"
 	"text/template"
 
 	"github.com/fatih/structs"
@@ -27,8 +28,25 @@ type Rule struct {
 }
 
 // compile initialises rule templates
-func (r *Rule) compile(left, right string) {
-	r.Template = template.Must(template.New(r.Name).Delims(left, right).Funcs(funcMap).Parse(r.Expr))
+func (r *Rule) compile(left, right string, defaultfuncs, userfuncs template.FuncMap) {
+	allFuncs := template.FuncMap{}
+	for k, v := range defaultfuncs {
+		allFuncs[k] = v
+	}
+	for k, v := range userfuncs {
+		allFuncs[k] = v
+	}
+
+	t, err := template.New(r.Name).Delims(left, right).Funcs(allFuncs).Parse(r.Expr)
+	if err != nil {
+		if strings.Contains(err.Error(), "not defined") {
+			log.Println("skip compiling rule", r.Name, "error :", err)
+		} else {
+			return
+		}
+	}
+
+	r.Template = t
 }
 
 // Rules is a collection of rules for a valid go type
@@ -101,15 +119,17 @@ func (r *RuleResult) MapVal() map[string]interface{} {
 
 // Parser holds the rules from a rule file
 type Parser struct {
-	Name     xml.Name `xml:"roulette"`
-	Children []*Rules `xml:"rules"`
-
+	Name           xml.Name `xml:"roulette"`
+	Children       []*Rules `xml:"rules"`
+	defaultFuncs   template.FuncMap
+	userfuncs      template.FuncMap
 	sortedChildren map[string]*Rules
 	delimLeft      string
 	delimRight     string
 }
 
 func (p *Parser) compile() {
+
 	for _, rules := range p.Children {
 		p.sortedChildren[rules.TypeName] = rules
 	}
@@ -117,8 +137,7 @@ func (p *Parser) compile() {
 	for typeName, rules := range p.sortedChildren {
 
 		for _, rule := range rules.Children {
-			//fmt.Printf("%+v\n", rule)
-			rule.compile(p.delimLeft, p.delimRight)
+			rule.compile(p.delimLeft, p.delimRight, p.defaultFuncs, p.userfuncs)
 		}
 		// sort by rule priority
 		sort.Sort(p.sortedChildren[typeName])
@@ -139,7 +158,7 @@ func (p *Parser) ResultOne(val interface{}) (*RuleResult, error) {
 
 // ResultAll returns all rule results for the val's type sorted by priority
 func (p *Parser) ResultAll(val interface{}) []*RuleResult {
-	return p.results(val, len(p.Children))
+	return p.results(val, len(p.sortedChildren[structs.Name(val)].Children))
 }
 
 // results runs rule expressions against a type and returns a slice of RuleResult
@@ -157,6 +176,9 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 
 		var result bytes.Buffer
 		// execute rules
+		if rule.Template == nil {
+			continue
+		}
 		err := rule.Template.Execute(&result, data)
 		if err != nil {
 			log.Println(err)
@@ -244,6 +266,26 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 	return resultsArr
 }
 
+// AddFuncs allows additional functions to be added to the parser
+// Functions must be of the signature: f(arg1,arg2, prevVal ...string)string
+// See funcmap.go for examples.
+func (p *Parser) AddFuncs(funcMap template.FuncMap) {
+	for k, v := range funcMap {
+		p.userfuncs[k] = v
+	}
+
+	p.compile()
+}
+
+// RemoveFuncs removes previously added functions from the parser
+func (p *Parser) RemoveFuncs(funcMap template.FuncMap) {
+	for k := range funcMap {
+		delete(p.userfuncs, k)
+	}
+
+	p.compile()
+}
+
 // Delims sets the custom delimieters for parsing the text/template expression
 func (p *Parser) Delims(left, right string) {
 	p.delimLeft = left
@@ -268,6 +310,8 @@ func New(data []byte) (*Parser, error) {
 		delimLeft:      delimLeft,
 		delimRight:     delimRight,
 		sortedChildren: make(map[string]*Rules),
+		defaultFuncs:   defaultFuncMap,
+		userfuncs:      template.FuncMap{},
 	}
 
 	err := xml.Unmarshal(data, parser)
