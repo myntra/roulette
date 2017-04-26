@@ -1,6 +1,6 @@
 <p align="center">
   <h3 align="center">Roulette</h3>
-  <p align="center">A package which returns values/takes actions based on the rules defined in an xml file. These values can be further used to trigger actions.</p>
+  <p align="center">A text/template based package which outputs  data/actions based on the rules defined in an xml file.</p>
   <p align="center">
     <a href="https://travis-ci.org/myntra/roulette"><img src="https://travis-ci.org/myntra/roulette.svg?branch=master"></a>
     <a href="https://godoc.org/github.com/myntra/roulette"><img src="https://godoc.org/github.com/myntra/roulette?status.svg"></a>
@@ -10,18 +10,23 @@
 
 ---
 
-This pacakge is based on `text/template`. It uses the powerful control structures in `text/template` to return actionable data. With some reflect magic, it's also able to return updated concrete types as shown in the example below.
+This pacakge is based on `text/template`. It uses the powerful control structures in `text/template` to output data or actions. With some reflect magic, it's also able to output updated(based on the rules) concrete types as shown in the example below.
 
 ### go get
 ```
 $ go get github.com/myntra/roulette
 ```
 
-### Usage
+### Usage:
 
 From `examples/person`
 
-#### Define Rules in XML
+#### Defining Rules in XML:
+
+- Write valid `text/template` control structures within the `<rule>...</rule>` tag.
+- Namespace rules by go custom types. e.g: `<rules type="Person">...</rules>`
+- Make sure the output of the `text/template` control structures match `resultType`. The supported types are: `bool`, `float64`, `string`, `[]string`, `[]float64`, `map[string]interface{}`, `go custom types`.
+- Set `priority` of rules within a namespace `type`.
 
 ```xml
 <roulette>
@@ -61,7 +66,7 @@ From `examples/person`
 </roulette>
 ```
 
-#### Go
+#### Go API:
 
 
 ```go
