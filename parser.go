@@ -182,6 +182,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 		err := rule.Template.Execute(&result, data)
 		if err != nil {
 			log.Println(err)
+			continue
 		}
 
 		switch rule.ResultType {
@@ -189,6 +190,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var stringVar bool
 			err := json.Unmarshal(result.Bytes(), &stringVar)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ruleResult.val = stringVar
@@ -197,6 +199,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var boolVar bool
 			err := json.Unmarshal(result.Bytes(), &boolVar)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ruleResult.val = boolVar
@@ -206,6 +209,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var floatVar float64
 			err := json.Unmarshal(result.Bytes(), &floatVar)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ruleResult.val = floatVar
@@ -215,6 +219,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var sliceVar []float64
 			err := json.Unmarshal(result.Bytes(), &sliceVar)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ruleResult.val = sliceVar
@@ -223,6 +228,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var sliceVar []string
 			err := json.Unmarshal(result.Bytes(), &sliceVar)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ruleResult.val = sliceVar
@@ -232,6 +238,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var valMap map[string]interface{}
 			err := json.Unmarshal(result.Bytes(), &valMap)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 			ruleResult.val = valMap
@@ -252,6 +259,7 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			var valInterface interface{}
 			err = json.Unmarshal(result.Bytes(), &valInterface)
 			if err != nil {
+				log.Println(err)
 				continue
 			}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"text/template"
@@ -94,6 +95,7 @@ func set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...s
 
 	b, err := json.Marshal(newTypeVal.Interface())
 	if err != nil {
+		log.Println(err)
 		return ""
 	}
 

@@ -26,7 +26,7 @@
 
         <rule name="customFunc" resultType="bool" priority="5">
             <r>with .Person</r>
-                    <r>customFunc . "hello world"</r>
+                <r>customFunc . "hello world"</r>
             <r>end</r>
         </rule>
     </rules>
@@ -34,7 +34,7 @@
     <rules type="Company">
         <rule name="companyName" resultType="bool" priority="1">
                 <r>with .Company</r>
-                <r>eql .Name "Myntra" </r>
+                    <r>eql .Name "Myntra" </r>
                 <r>end</r>
         </rule>
     </rules>
