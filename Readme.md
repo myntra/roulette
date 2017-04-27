@@ -37,11 +37,11 @@ From `testrules/rules.xml`
         <rule name="setAge" priority="2">
                 <r>with .MyData</r>
                     <r>
-                       gte .Person.Experience 7 |
-                       within .Person.Age 15 30 |
-                       lte .Person.Vacations 5 | 
-                       eql .Person.Position "SSE" |
-                       eql .Company.Name "Myntra" | 
+                       ge .Person.Experience 7 |
+                       in .Person.Age 15 30 |
+                       le .Person.Vacations 5 | 
+                       eq .Person.Position "SSE" |
+                       eq .Company.Name "Myntra" | 
                        .Person.SetAge 25 
                     </r>
                 <r>end</r>
@@ -51,7 +51,7 @@ From `testrules/rules.xml`
                 <r>with .MyData</r>
                     <r>with .Person </r>
                         <r>
-                             eql .Position "SSE" |
+                             eq .Position "SSE" |
                             .SetSalary 50000
                         </r>
                     <r>end</r>
@@ -188,6 +188,7 @@ p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
   to allow rule execution status propagation.
 - Methods to be invoked from the rules file must also be of the above signature.
 - Invalid/Malformed rules are skipped and the error is logged.
+- The pipe `|` operator takes a previously evaluated value and passes it to the next function as the last argument.
 - For more information on go templating: [text/template](https://golang.org/pkg/text/template/)
 
 
@@ -211,6 +212,7 @@ The idea is to keep the templating language readable and easy to write.
 | not		   | `!op` , e.g.`not 1`|
 | and 		   | `op1 && op2`, e.g. `and (expr1) (expr2)`|
 | or 		   | `op1 // op2`, e.g. `or (expr1) (expr2)`|
+| `|` pipe 		   | `the output of fn1 is the last argument of fn2`, e.g. `fn1 | fn2`|
 
 
 #### TODO
