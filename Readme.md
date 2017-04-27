@@ -1,4 +1,6 @@
 <p align="center">
+  <img src="https://cdn.rawgit.com/myntra/roulette/master/images/roulette.png" height="100" width="100" />
+
   <h3 align="center">Roulette</h3>
   <p align="center">A text/template based package which outputs  data/actions based on the rules defined in an xml file.</p>
   <p align="center">
@@ -173,4 +175,5 @@ Default functions reside in `funcmap.go`
 | eql           |  == op, `eq "hello" "world"` | `eql(fieldVal interface{}, val interface{}, prevVal ...string)string` |
 | set           |  set field value in custom type, output resolves to concrete type in code, `set .Age 25` | `set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...string) string` |
 
-
+#### Attribution
+The roulette.png image is sourced from https://thenounproject.com/term/roulette/143243/ with a CC licence
