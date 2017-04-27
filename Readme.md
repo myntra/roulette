@@ -29,23 +29,6 @@ $ go get github.com/myntra/roulette
 
 ### Usage:
 
-#### Defining Rules in XML:
-
-- Write valid `text/template` control structures within the `<rule>...</rule>` tag.
-- Namespace rules by custom types. e.g: 
-
-	`<rules types="Person,Company">...</rules>`
-
-- Set `priority` of rules within namespace `types`.
-- Add custom functions to the parser using the method `parser.AddFuncs`. The function must have the signature:
-	
-	`func(arg1,...,argN,prevVal ...bool)bool`
- 
-  to allow rule execution status propagation.
-- Methods to be invoked from the rules file must also be of the above signature.
-- Invalid/Malformed rules are skipped and the error is logged.
-- For more information on go templating: [text/template](https://golang.org/pkg/text/template/)
-
 From `testrules/rules.xml`
 
 ```xml
@@ -189,6 +172,23 @@ p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
     </rules>
 </roulette>
 ```
+
+#### Defining Rules in XML:
+
+- Write valid `text/template` control structures within the `<rule>...</rule>` tag.
+- Namespace rules by custom types. e.g: 
+
+	`<rules types="Person,Company">...</rules>`
+
+- Set `priority` of rules within namespace `types`.
+- Add custom functions to the parser using the method `parser.AddFuncs`. The function must have the signature:
+	
+	`func(arg1,...,argN,prevVal ...bool)bool`
+ 
+  to allow rule execution status propagation.
+- Methods to be invoked from the rules file must also be of the above signature.
+- Invalid/Malformed rules are skipped and the error is logged.
+- For more information on go templating: [text/template](https://golang.org/pkg/text/template/)
 
 
 
