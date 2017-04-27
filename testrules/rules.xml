@@ -3,12 +3,10 @@
         <rule name="setAge" priority="2">
                 <r>with .MyData</r>
                     <r>
-                       gte .Person.Experience 7 |
-                       within .Person.Age 15 30 |
-                       lte .Person.Vacations 5 | 
-                       eql .Person.Position "SSE" |
-                       eql .Company.Name "Myntra" | 
-                       .Person.SetAge 25 
+                       le .Person.Vacations 5 |
+                       and (gt .Person.Experience 6) (in .Person.Age 15 30) |
+                       or (eq .Person.Position "SSE") (eq .Company.Name "Myntra") |
+                       .Person.SetAge 25
                     </r>
                 <r>end</r>
         </rule>
@@ -17,8 +15,7 @@
                 <r>with .MyData</r>
                     <r>with .Person </r>
                         <r>
-                             eql .Position "SSE" |
-                            .SetSalary 50000
+                             eq .Position "SSE" | .SetSalary 50000
                         </r>
                     <r>end</r>
                 <r>end</r>

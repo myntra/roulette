@@ -37,6 +37,15 @@ type Company struct {
 	Name string
 }
 
+func checkPrevVal(prevVal []bool) bool {
+	if len(prevVal) > 0 {
+		if !prevVal[0] {
+			return false
+		}
+	}
+	return true
+}
+
 func check(err error) {
 	if err != nil {
 		panic(err)

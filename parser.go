@@ -127,11 +127,23 @@ func (p *Parser) multiTypesResult(typeName string, one bool, vals interface{}) e
 // AddFuncs allows additional functions to be added to the parser
 // Functions must be of the signature: f(arg1,arg2, prevVal ...string)string
 // See funcmap.go for examples.
-func (p *Parser) AddFuncs(funcMap template.FuncMap) {
-	for k, v := range funcMap {
-		p.userfuncs[k] = v
+func (p *Parser) AddFuncs(funcMap template.FuncMap) error {
+	for name, fn := range funcMap {
+		if !goodName(name) {
+			return fmt.Errorf("function name %s is not a valid identifier", name)
+		}
+		v := reflect.ValueOf(fn)
+		if v.Kind() != reflect.Func {
+			return fmt.Errorf("value for " + name + " not a function")
+		}
+		if !goodFunc(v.Type()) {
+			return fmt.Errorf("can't install method/function %q with %d results", name, v.Type().NumOut())
+		}
+		p.userfuncs[name] = fn
 	}
 	p.compile()
+
+	return nil
 }
 
 // RemoveFuncs removes previously added functions from the parser
