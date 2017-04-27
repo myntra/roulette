@@ -15,6 +15,11 @@ type Person struct {
 	Position   string
 }
 
+func (p *Person) SetAge(age ...string) bool {
+	p.Age = 25
+	return true
+}
+
 // Company ...
 type Company struct {
 	Name string
@@ -25,8 +30,6 @@ func check(err error) {
 		panic(err)
 	}
 }
-
-var p = Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
 
 func getParser(path string) *Parser {
 	ruleFile, err := ioutil.ReadFile(path)
@@ -42,6 +45,8 @@ func getParser(path string) *Parser {
 
 func TestRuleFile(t *testing.T) {
 
+	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
+
 	//c := Company{Name: "myntra"}
 	parser := getParser("testrules/test_rule.xml")
 
@@ -54,7 +59,8 @@ func TestRuleFile(t *testing.T) {
 
 }
 
-func TestRuleSetField(t *testing.T) {
+func TestRuleSetFieldResultOne(t *testing.T) {
+	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
 	parser := getParser("testrules/test_rule_setfield.xml")
 	// get top priority result
 	ruleResult, err := parser.ResultOne(p)
@@ -73,5 +79,15 @@ func TestRuleSetField(t *testing.T) {
 	if v.Age != 25 {
 		log.Fatal("Age field was not set")
 	}
+
+}
+
+func TestTypeMethodCall(t *testing.T) {
+	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
+	parser := getParser("testrules/test_rule_type_method.xml")
+	// get top priority result
+	parser.Execute(&p)
+
+	fmt.Println("updated", p)
 
 }

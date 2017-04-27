@@ -110,6 +110,12 @@ type Person struct {
 	Position   string
 }
 
+// SetAge ...
+func (p *Person) SetAge(age ...string) bool {
+	p.Age = 25
+	return true
+}
+
 // Company ...
 type Company struct {
 	Name string
@@ -173,13 +179,19 @@ func main() {
 		fmt.Println(ruleResult.Name(), ruleResult.BoolVal())
 	}
 
-	// use another type
+	// use company type
 	ruleResult, err = parser.ResultOne(c)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Println(ruleResult.Name(), ruleResult.BoolVal())
+
+	// modify person
+	p2 := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
+	parser = getParser("../../testrules/test_rule_type_method.xml")
+	parser.Execute(&p2)
+	fmt.Println("updated", p2)
 
 }
 

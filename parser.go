@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"log"
 	"reflect"
 	"sort"
@@ -72,8 +73,14 @@ func (r *Rules) hasType(typ string) bool {
 
 // RuleResult contains result of single rule expression
 type RuleResult struct {
-	name string      // rule name
-	val  interface{} // rule result value
+	name         string      // rule name
+	val          interface{} // rule result value
+	isCustomType bool
+}
+
+// IsCustomType returns true if val is custom/user defined
+func (r *RuleResult) IsCustomType() bool {
+	return r.isCustomType
 }
 
 // Name returns the rule name
@@ -141,8 +148,13 @@ func (p *Parser) compile() {
 		}
 		// sort by rule priority
 		sort.Sort(p.sortedChildren[typeName])
-
 	}
+}
+
+// Execute executes all rules on the type without returning ruleresults.
+// This method expects a pointer type. It's the rule's responsibility
+func (p *Parser) Execute(val interface{}) {
+	p.results(val, 1)
 }
 
 // ResultOne returns the top priority rule's result for the val's type.
@@ -153,7 +165,6 @@ func (p *Parser) ResultOne(val interface{}) (*RuleResult, error) {
 		return nil, errors.New("No rule was triggered!")
 	}
 	return res[0], nil
-
 }
 
 // ResultAll returns all rule results for the val's type sorted by priority
@@ -167,7 +178,12 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 	var resultsArr []*RuleResult
 	typeName := structs.Name(val)
 
-	for _, rule := range p.sortedChildren[typeName].Children[:end] {
+	v, ok := p.sortedChildren[typeName]
+	if !ok {
+		return resultsArr
+	}
+
+	for _, rule := range v.Children[:end] {
 
 		ruleResult := &RuleResult{name: rule.Name}
 
@@ -249,9 +265,11 @@ func (p *Parser) results(val interface{}, end int) []*RuleResult {
 			res := bytes.TrimSpace(result.Bytes())
 			err := json.Unmarshal(res, newVal.Interface())
 			if err != nil {
-				log.Println(err)
+				//log.Println("case val type", err)
 				continue
 			}
+			val = newVal.Interface()
+			fmt.Println(newVal.Interface())
 			ruleResult.val = newVal.Interface()
 			break
 
@@ -281,7 +299,6 @@ func (p *Parser) AddFuncs(funcMap template.FuncMap) {
 	for k, v := range funcMap {
 		p.userfuncs[k] = v
 	}
-
 	p.compile()
 }
 

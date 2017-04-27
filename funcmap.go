@@ -79,6 +79,11 @@ func set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...s
 		}
 	}
 
+	valof := reflect.ValueOf(typeVal)
+	if valof.Kind() == reflect.Ptr {
+		log.Println("xxxxxxxxxx", "is of pointer type")
+	}
+
 	// get map
 	m := structs.Map(typeVal)
 	m[fieldTypeVal] = val
@@ -86,7 +91,7 @@ func set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...s
 	// get new type
 	newTypeVal := reflect.New(reflect.TypeOf(typeVal))
 
-	deepcopier.Copy(typeVal).To(newTypeVal.Interface())
+	deepcopier.Copy(typeVal).To(newTypeVal)
 	setFieldIn(newTypeVal.Interface(), fieldTypeVal, val)
 
 	b, err := json.Marshal(newTypeVal.Interface())
