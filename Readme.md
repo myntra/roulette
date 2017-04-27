@@ -210,7 +210,7 @@ The idea is to keep the templating language readable and easy to write.
 | ne           |  `!= op`, e.g.`ne "hello" "world"` |
 | not		   | `!op` , e.g.`not 1`|
 | and 		   | `op1 && op2`, e.g. `and (expr1) (expr2)`|
-| or 		   | `op1 || op2`, e.g. `or (expr1) (expr2)`|
+| or 		   | `op1 // op2`, e.g. `or (expr1) (expr2)`|
 
 
 #### TODO
