@@ -164,7 +164,7 @@ p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
 
 
 ```xml
-	<roulette>
+<roulette>
     <rules types="Person,Company" dataKey="MyData">        
         <rule name="setAge" priority="2">
                 <r>with .MyData</r>
