@@ -1,8 +1,4 @@
-hash: 404d8ee926b46c962e2390662df3679945f49e3713164d666a5812bc1df3ee85
-updated: 2017-04-27T03:02:33.02871945+05:30
-imports:
-- name: github.com/fatih/structs
-  version: a720dfa8df582c51dee1b36feabb906bde1588bd
-- name: github.com/ulule/deepcopier
-  version: 69bc5efd379aa16512b3ff88028eb781ac7ff8bc
+hash: d1d131852dd114e3494e1dd30a0f04b5b5732f799ccb9af56abadfd715790697
+updated: 2017-04-28T00:23:43.718859799+05:30
+imports: []
 testImports: []

@@ -1,5 +1,2 @@
 package: github.com/myntra/roulette
-import:
-- package: github.com/fatih/structs
-  version: ^1.0.0
-- package: github.com/ulule/deepcopier
+import: []

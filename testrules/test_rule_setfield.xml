@@ -1,9 +1,0 @@
-<roulette>
-    <rules type="Person">        
-        <rule name="setAgeField" resultType="Person" priority="1">
-                <r>with .Person</r>
-                    <r>gte .Experience 7 | within .Age 15 30 | lte .Vacations 5 | eql .Position "SSE" | set . "Age" 25 </r>
-                <r>end</r>
-        </rule>
-    </rules>
-</roulette>

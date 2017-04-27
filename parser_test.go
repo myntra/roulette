@@ -1,7 +1,6 @@
 package roulette
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -13,10 +12,23 @@ type Person struct {
 	Experience int
 	Vacations  int
 	Position   string
+	Salary     int
 }
 
-func (p *Person) SetAge(age ...string) bool {
-	p.Age = 25
+func (p *Person) SetAge(age int, prevVal ...bool) bool {
+	if !checkPrevVal(prevVal) {
+		return false
+	}
+	p.Age = age
+	return true
+}
+
+// SetSalary ...
+func (p *Person) SetSalary(salary int, prevVal ...bool) bool {
+	if !checkPrevVal(prevVal) {
+		return false
+	}
+	p.Salary = salary
 	return true
 }
 
@@ -43,51 +55,38 @@ func getParser(path string) *Parser {
 	return parser
 }
 
-func TestRuleFile(t *testing.T) {
-
+func TestExecuteAllMultiType(t *testing.T) {
 	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
+	c := Company{Name: "Myntra"}
 
-	//c := Company{Name: "myntra"}
-	parser := getParser("testrules/test_rule.xml")
-
-	ruleResults := parser.ResultAll(p)
-
-	for _, result := range ruleResults {
-
-		fmt.Println(result.Name())
-	}
-
-}
-
-func TestRuleSetFieldResultOne(t *testing.T) {
-	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
-	parser := getParser("testrules/test_rule_setfield.xml")
-	// get top priority result
-	ruleResult, err := parser.ResultOne(p)
+	// execute all rules
+	parser := getParser("testrules/rules.xml")
+	err := parser.Execute(&p, &c)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if ruleResult.Name() != "setAgeField" {
-		log.Fatal("top priority rule was not returned")
-	}
 
-	v, ok := ruleResult.Val().(*Person)
-	if !ok {
-		log.Fatal("Incorrect type returned")
+	if p.Age != 25 {
+		log.Fatal("Expected Age to be set to 25")
 	}
-
-	if v.Age != 25 {
-		log.Fatal("Age field was not set")
-	}
-
 }
 
-func TestTypeMethodCall(t *testing.T) {
+func TestExecuteOne(t *testing.T) {
 	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
-	parser := getParser("testrules/test_rule_type_method.xml")
-	// get top priority result
-	parser.Execute(&p)
+	c := Company{Name: "Myntra"}
 
-	fmt.Println("updated", p)
+	// execute all rules
+	parser := getParser("testrules/rules.xml")
+	err := parser.ExecuteOne(&p, &c)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	if p.Age == 25 {
+		log.Fatal("Expected Age to be 20")
+	}
+
+	if p.Salary != 50000 {
+		log.Fatal("Expected Salary to be 50000")
+	}
 }

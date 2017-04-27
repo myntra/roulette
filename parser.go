@@ -11,118 +11,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
-
-	"github.com/fatih/structs"
 )
-
-// default delimeters
-var delimLeft = "<r>"
-var delimRight = "</r>"
-
-// Rule is a single rule expression. A rule expression is a valid go text/template
-type Rule struct {
-	Name       string `xml:"name,attr"`
-	ResultType string `xml:"resultType,attr"`
-	Priority   int    `xml:"priority,attr"`
-	Expr       string `xml:",innerxml"`
-	Template   *template.Template
-}
-
-// compile initialises rule templates
-func (r *Rule) compile(left, right string, defaultfuncs, userfuncs template.FuncMap) {
-	allFuncs := template.FuncMap{}
-	for k, v := range defaultfuncs {
-		allFuncs[k] = v
-	}
-	for k, v := range userfuncs {
-		allFuncs[k] = v
-	}
-
-	t, err := template.New(r.Name).Delims(left, right).Funcs(allFuncs).Parse(r.Expr)
-	if err != nil {
-		if strings.Contains(err.Error(), "not defined") {
-			log.Println("skip compiling rule", r.Name, "error :", err)
-		} else {
-			return
-		}
-	}
-
-	r.Template = t
-}
-
-// Rules is a collection of rules for a valid go type
-type Rules struct {
-	TypeName string  `xml:"type,attr"`
-	Children []*Rule `xml:"rule"`
-}
-
-// sort rules by priority
-func (r *Rules) Len() int {
-	return len(r.Children)
-}
-func (r *Rules) Swap(i, j int) {
-	r.Children[i], r.Children[j] = r.Children[j], r.Children[i]
-}
-func (r *Rules) Less(i, j int) bool {
-	return r.Children[i].Priority < r.Children[j].Priority
-}
-
-func (r *Rules) hasType(typ string) bool {
-	return r.TypeName == typ
-}
-
-// RuleResult contains result of single rule expression
-type RuleResult struct {
-	name         string      // rule name
-	val          interface{} // rule result value
-	isCustomType bool
-}
-
-// IsCustomType returns true if val is custom/user defined
-func (r *RuleResult) IsCustomType() bool {
-	return r.isCustomType
-}
-
-// Name returns the rule name
-func (r *RuleResult) Name() string {
-	return r.name
-}
-
-// Val returns the value of the result as an interface{}
-// When resultType="CustomType", assert:  r.Val().(packageName.CustomType), for getting the concrete type
-func (r *RuleResult) Val() interface{} {
-	return r.val
-}
-
-// StringVal asserts value of the result for string type
-func (r *RuleResult) StringVal() string {
-	return r.val.(string)
-}
-
-// BoolVal asserts value of the result for bool type
-func (r *RuleResult) BoolVal() bool {
-	return r.val.(bool)
-}
-
-// FloatVal asserts value of the result for float64 type
-func (r *RuleResult) FloatVal() float64 {
-	return r.val.(float64)
-}
-
-// FloatArrayVal asserts value of the result for []float64 type
-func (r *RuleResult) FloatArrayVal() []float64 {
-	return r.val.([]float64)
-}
-
-// StringArrayVal asserts value of the result for []string type
-func (r *RuleResult) StringArrayVal() []string {
-	return r.val.([]string)
-}
-
-// MapVal asserts value of the result for map[string]interface{} type
-func (r *RuleResult) MapVal() map[string]interface{} {
-	return r.val.(map[string]interface{})
-}
 
 // Parser holds the rules from a rule file
 type Parser struct {
@@ -136,7 +25,6 @@ type Parser struct {
 }
 
 func (p *Parser) compile() {
-
 	for _, rules := range p.Children {
 		p.sortedChildren[rules.TypeName] = rules
 	}
@@ -151,145 +39,89 @@ func (p *Parser) compile() {
 	}
 }
 
-// Execute executes all rules on the type without returning ruleresults.
-// This method expects a pointer type. It's the rule's responsibility
-func (p *Parser) Execute(val interface{}) {
-	p.results(val, 1)
+// Execute executes all rules in order of priority.
+func (p *Parser) Execute(vals ...interface{}) error {
+	typeName := p.buildMultiTypeName(vals)
+	return p.multiTypesResult(typeName, false, vals)
 }
 
-// ResultOne returns the top priority rule's result for the val's type.
-func (p *Parser) ResultOne(val interface{}) (*RuleResult, error) {
+// ExecuteOne executes in order of priority until a high priority rule is successful, after which rule
+// execution stops.
+func (p *Parser) ExecuteOne(vals ...interface{}) error {
+	typeName := p.buildMultiTypeName(vals)
+	return p.multiTypesResult(typeName, true, vals)
+}
 
-	res := p.results(val, 1)
-	if len(res) == 0 {
-		return nil, errors.New("No rule was triggered!")
+func getType(myvar interface{}) string {
+	valueOf := reflect.ValueOf(myvar)
+
+	if valueOf.Type().Kind() == reflect.Ptr {
+		return reflect.Indirect(valueOf).Type().Name()
 	}
-	return res[0], nil
+	return valueOf.Type().Name()
 }
 
-// ResultAll returns all rule results for the val's type sorted by priority
-func (p *Parser) ResultAll(val interface{}) []*RuleResult {
-	return p.results(val, len(p.sortedChildren[structs.Name(val)].Children))
+func (p *Parser) buildMultiTypeName(vals interface{}) string {
+	var typeName string
+	for _, v := range vals.([]interface{}) {
+		typeName = typeName + getType(v) + ","
+	}
+	typeName = strings.TrimRight(typeName, ",")
+	return typeName
 }
 
-// results runs rule expressions against a type and returns a slice of RuleResult
-func (p *Parser) results(val interface{}, end int) []*RuleResult {
-
-	var resultsArr []*RuleResult
-	typeName := structs.Name(val)
-
-	v, ok := p.sortedChildren[typeName]
+func (p *Parser) multiTypesResult(typeName string, one bool, vals interface{}) error {
+	rules, ok := p.sortedChildren[typeName]
 	if !ok {
-		return resultsArr
+		return fmt.Errorf("No rules found for types:%s", typeName)
 	}
 
-	for _, rule := range v.Children[:end] {
+	if rules.DataKey == "" {
+		return fmt.Errorf("No dataKey found for types:%s", typeName)
+	}
 
-		ruleResult := &RuleResult{name: rule.Name}
+	var tmplData map[string]interface{}
 
-		data := make(map[string]interface{})
-		data[structs.Name(val)] = val
+	valsData := make(map[string]interface{})
+	for _, val := range vals.([]interface{}) {
+		valsData[getType(val)] = val
+	}
 
-		var result bytes.Buffer
+	tmplData = valsData
+
+	if len(vals.([]interface{})) > 1 {
+		tmplData[rules.DataKey] = valsData
+	}
+
+	for _, rule := range rules.Children {
 		// execute rules
 		if rule.Template == nil {
+			log.Println(errors.New("rule expression not found"))
 			continue
 		}
-		err := rule.Template.Execute(&result, data)
+
+		var buf bytes.Buffer
+		err := rule.Template.Execute(&buf, tmplData)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		switch rule.ResultType {
-		case "string":
-			var stringVar bool
-			err := json.Unmarshal(result.Bytes(), &stringVar)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			ruleResult.val = stringVar
-			break
-		case "bool":
-			var boolVar bool
-			err := json.Unmarshal(result.Bytes(), &boolVar)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			ruleResult.val = boolVar
-			break
-
-		case "float":
-			var floatVar float64
-			err := json.Unmarshal(result.Bytes(), &floatVar)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			ruleResult.val = floatVar
-			break
-
-		case "float_array":
-			var sliceVar []float64
-			err := json.Unmarshal(result.Bytes(), &sliceVar)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			ruleResult.val = sliceVar
-			break
-		case "string_array":
-			var sliceVar []string
-			err := json.Unmarshal(result.Bytes(), &sliceVar)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			ruleResult.val = sliceVar
-			break
-
-		case "map":
-			var valMap map[string]interface{}
-			err := json.Unmarshal(result.Bytes(), &valMap)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			ruleResult.val = valMap
-			break
-
-		case structs.Name(val):
-			newVal := reflect.New(reflect.TypeOf(val))
-			res := bytes.TrimSpace(result.Bytes())
-			err := json.Unmarshal(res, newVal.Interface())
-			if err != nil {
-				//log.Println("case val type", err)
-				continue
-			}
-			val = newVal.Interface()
-			fmt.Println(newVal.Interface())
-			ruleResult.val = newVal.Interface()
-			break
-
-		default:
-			var valInterface interface{}
-			err = json.Unmarshal(result.Bytes(), &valInterface)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-
-			ruleResult.val = valInterface
-
+		var result bool
+		err = json.Unmarshal(buf.Bytes(), &result)
+		if err != nil {
+			log.Println(err)
+			continue
 		}
 
-		resultsArr = append(resultsArr, ruleResult)
+		// first high priority rule successful, break
+		if result && one {
+			break
+		}
 
 	}
 
-	return resultsArr
+	return nil
 }
 
 // AddFuncs allows additional functions to be added to the parser

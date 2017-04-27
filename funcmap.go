@@ -1,110 +1,57 @@
 package roulette
 
-import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"log"
-	"reflect"
-	"text/template"
+import "text/template"
 
-	"github.com/fatih/structs"
-	"github.com/ulule/deepcopier"
-)
-
-// http://stackoverflow.com/questions/6395076/in-golang-using-reflect-how-do-you-set-the-value-of-a-struct-field
-
-func within(fieldVal int, minVal int, maxVal int, prevVal ...string) string {
+func checkPrevVal(prevVal []bool) bool {
 	if len(prevVal) > 0 {
-		if prevVal[0] == "false" {
-			return "false"
+		if !prevVal[0] {
+			return false
 		}
 	}
+	return true
+}
 
-	//fmt.Println(typeName, fieldVal, minVal, maxVal)
+func within(fieldVal int, minVal int, maxVal int, prevVal ...bool) bool {
+	if !checkPrevVal(prevVal) {
+		return false
+	}
+
 	if fieldVal >= minVal && fieldVal <= maxVal {
-		return "true"
+		return true
 	}
-	return "false"
+	return false
 }
 
-func gte(fieldVal int, minVal int, prevVal ...string) string {
-
-	if len(prevVal) > 0 {
-		if prevVal[0] == "false" {
-			return "false"
-		}
+func gte(fieldVal int, minVal int, prevVal ...bool) bool {
+	if !checkPrevVal(prevVal) {
+		return false
 	}
-
-	//fmt.Println(typeName, fieldVal, maxVal)
 	if fieldVal >= minVal {
-		return "true"
+		return true
 	}
-	return "false"
+	return false
 }
 
-func lte(fieldVal int, maxVal int, prevVal ...string) string {
-
-	if len(prevVal) > 0 {
-		if prevVal[0] == "false" {
-			return "false"
-		}
+func lte(fieldVal int, maxVal int, prevVal ...bool) bool {
+	if !checkPrevVal(prevVal) {
+		return false
 	}
-
-	//fmt.Println(typeName, fieldVal, maxVal)
 	if fieldVal <= maxVal {
-		return "true"
+		return true
 	}
-	return "false"
+	return false
 }
 
-func eql(fieldVal interface{}, val interface{}, prevVal ...string) string {
-	if len(prevVal) > 0 {
-		if prevVal[0] == "false" {
-			return "false"
-		}
+func eql(fieldVal interface{}, val interface{}, prevVal ...bool) bool {
+	if !checkPrevVal(prevVal) {
+		return false
 	}
-
 	if fieldVal == val {
-		return "true"
-	}
-	return "false"
-}
 
-// set sets a field in a type
-func set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...string) string {
-	if len(prevVal) > 0 {
-		if prevVal[0] == "false" {
-			return ""
-		}
+		return true
 	}
 
-	valof := reflect.ValueOf(typeVal)
-	if valof.Kind() == reflect.Ptr {
-		log.Println("xxxxxxxxxx", "is of pointer type")
-	}
-
-	// get map
-	m := structs.Map(typeVal)
-	m[fieldTypeVal] = val
-
-	// get new type
-	newTypeVal := reflect.New(reflect.TypeOf(typeVal))
-
-	deepcopier.Copy(typeVal).To(newTypeVal)
-	setFieldIn(newTypeVal.Interface(), fieldTypeVal, val)
-
-	b, err := json.Marshal(newTypeVal.Interface())
-	if err != nil {
-		log.Println(err)
-		return ""
-	}
-
-	ret := string(b)
-
-	//fmt.Println(ret)
-
-	return ret
+	return false
 }
 
 var defaultFuncMap = template.FuncMap{
@@ -113,27 +60,4 @@ var defaultFuncMap = template.FuncMap{
 	"gte":    gte,
 	"lte":    lte,
 	"eql":    eql,
-	"set":    set,
-}
-
-func setFieldIn(obj interface{}, name string, value interface{}) error {
-	structValue := reflect.ValueOf(obj).Elem()
-	structFieldValue := structValue.FieldByName(name)
-
-	if !structFieldValue.IsValid() {
-		return fmt.Errorf("No such field: %s in obj", name)
-	}
-
-	if !structFieldValue.CanSet() {
-		return fmt.Errorf("Cannot set %s field value", name)
-	}
-
-	structFieldType := structFieldValue.Type()
-	val := reflect.ValueOf(value)
-	if structFieldType != val.Type() {
-		return errors.New("Provided value type didn't match obj field type")
-	}
-
-	structFieldValue.Set(val)
-	return nil
 }

@@ -1,0 +1,27 @@
+<roulette>
+    <rules types="Person,Company" dataKey="MyData">        
+        <rule name="setAge" priority="2">
+                <r>with .MyData</r>
+                    <r>
+                       gte .Person.Experience 7 |
+                       within .Person.Age 15 30 |
+                       lte .Person.Vacations 5 | 
+                       eql .Person.Position "SSE" |
+                       eql .Company.Name "Myntra" | 
+                       .Person.SetAge 25 
+                    </r>
+                <r>end</r>
+        </rule>
+
+        <rule name="setSalary" priority="1">
+                <r>with .MyData</r>
+                    <r>with .Person </r>
+                        <r>
+                             eql .Position "SSE" |
+                            .SetSalary 50000
+                        </r>
+                    <r>end</r>
+                <r>end</r>
+        </rule>
+    </rules>
+</roulette>
