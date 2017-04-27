@@ -212,7 +212,10 @@ The idea is to keep the templating language readable and easy to write.
 | not		   | `!op` , e.g.`not 1`|
 | and 		   | `op1 && op2`, e.g. `and (expr1) (expr2)`|
 | or 		   | `op1 // op2`, e.g. `or (expr1) (expr2)`|
-| `|` pipe 		   | `the output of fn1 is the last argument of fn2`, e.g. `fn1 | fn2`|
+ 
+
+
+ - pipe operator | : `Usage: the output of fn1 is the last argument of fn2`, e.g. `fn1 1 2| fn2 1 2 `
 
 
 #### TODO
