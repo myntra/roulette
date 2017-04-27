@@ -27,6 +27,8 @@ From `examples/person`
 - Namespace rules by go custom types. e.g: `<rules type="Person">...</rules>`
 - Make sure the output of the `text/template` control structures match `resultType`. The supported types are: `bool`, `float64`, `string`, `[]string`, `[]float64`, `map[string]interface{}`, `go custom types`.
 - Set `priority` of rules within a namespace `type`.
+- Add custom functions to the parser using the method `parser.AddFuncs`. The function must have the signature `f(arg1,...,arg4,preval ...string)string` to allow pipelining.
+- For more information on go templating: [text/template](https://golang.org/pkg/text/template/)
 
 ```xml
 <roulette>
