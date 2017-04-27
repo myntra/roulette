@@ -11,8 +11,16 @@
 </p>
 
 ---
+### Features
 
-This pacakge is based on `text/template`. It uses the powerful control structures in `text/template` to output data or actions. With some reflect magic, it's also able to output updated(based on the rules) concrete types as shown in the example below.
+- Powerful `text/template` control structures.
+- Can update a `struct` value based on rules defined in an xml.
+- Supports custom trigger functions.
+- Supports multiple(basic and custom) types as rule trigger results.
+- Can namespace a set of rules for a go custom `type`.
+
+
+This pacakge is useful for firing business rules dynamically. It uses the powerful control structures in `text/template` to output data or actions. With some reflect magic, it's also able to output updated(based on the rules) concrete types as shown in the example below.
 
 ### go get
 ```
@@ -20,8 +28,6 @@ $ go get github.com/myntra/roulette
 ```
 
 ### Usage:
-
-From `examples/person`
 
 #### Defining Rules in XML:
 
@@ -32,6 +38,8 @@ From `examples/person`
 - Add custom functions to the parser using the method `parser.AddFuncs`. The function must have the signature `f(arg1,...,arg4,preval ...string)string` to allow pipelining.
 - Invalid/Malformed rules are skipped and the error is logged.
 - For more information on go templating: [text/template](https://golang.org/pkg/text/template/)
+
+From `testrules/test_rule.xml`
 
 ```xml
 <roulette>
@@ -59,12 +67,18 @@ From `examples/person`
                     <r>gte .Experience 7 | within .Age 15 30 | lte .Vacations 5 | eql .Position "SSE" | set . "Age" 25 </r>
                 <r>end</r>
         </rule>
+
+        <rule name="customFunc" resultType="bool" priority="5">
+            <r>with .Person</r>
+                <r>customFunc . "hello world"</r>
+            <r>end</r>
+        </rule>
     </rules>
 
     <rules type="Company">
-        <rule name="ageWithinRange" resultType="bool">
+        <rule name="companyName" resultType="bool" priority="1">
                 <r>with .Company</r>
-                <r>eql .Name "Myntra" </r>
+                    <r>eql .Name "Myntra" </r>
                 <r>end</r>
         </rule>
     </rules>
@@ -73,6 +87,7 @@ From `examples/person`
 
 #### Go API:
 
+From `examples/person/main.go`
 
 ```go
 package main
@@ -81,6 +96,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"text/template"
 
 	"github.com/myntra/roulette"
 )
@@ -119,6 +135,12 @@ func main() {
 	c := Company{Name: "Myntra"}
 
 	parser := getParser("../../testrules/test_rule.xml")
+
+	// add custom functions
+	parser.AddFuncs(template.FuncMap{
+		"customFunc": customFunc,
+	})
+
 	// get only the top priority result
 	ruleResult, err := parser.ResultOne(p)
 	if err != nil {
@@ -151,6 +173,7 @@ func main() {
 		fmt.Println(ruleResult.Name(), ruleResult.BoolVal())
 	}
 
+	// use another type
 	ruleResult, err = parser.ResultOne(c)
 	if err != nil {
 		log.Fatal(err)
@@ -158,6 +181,13 @@ func main() {
 
 	fmt.Println(ruleResult.Name(), ruleResult.BoolVal())
 
+}
+
+// this function signature is required:
+// f(arg1,arg2, prevVal ...string)string
+func customFunc(val1 interface{}, val2 string, prevVal ...string) string {
+	fmt.Println("customFunc trigerred", val1, val2, prevVal)
+	return "true"
 }
 ```
 
