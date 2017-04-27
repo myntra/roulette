@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strings"
 	"text/template"
 
 	"github.com/fatih/structs"
@@ -14,9 +13,6 @@ import (
 )
 
 // http://stackoverflow.com/questions/6395076/in-golang-using-reflect-how-do-you-set-the-value-of-a-struct-field
-func rule(name string, result string) string {
-	return strings.TrimSpace(name) + "," + strings.TrimSpace(result) + ","
-}
 
 func within(fieldVal int, minVal int, maxVal int, prevVal ...string) string {
 	if len(prevVal) > 0 {
@@ -108,7 +104,6 @@ func set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...s
 
 var defaultFuncMap = template.FuncMap{
 	// The name "title" is what the function will be called in the template text.
-	"rule":   rule,
 	"within": within,
 	"gte":    gte,
 	"lte":    lte,

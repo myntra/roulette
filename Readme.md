@@ -158,3 +158,19 @@ func main() {
 
 }
 ```
+
+#### Builtin Functions
+
+Apart from the built-in functions from `text/template`, the following functions are available. Some functions have been overidden to make their output parseable.
+
+Default functions reside in `funcmap.go`
+
+| Function      | Usage         | Signature  |
+| ------------- |:-------------:| -----:|
+| within           |  val >= minVal && val <= maxval, `within 2 1 4` | `within(fieldVal int, minVal int, prevVal ...string)string`
+| gte           |  >= op, `gte 1 2` | `gte(fieldVal int, minVal int, prevVal ...string)string`
+| lte           |  <= op, `lte 1 2` | `lte(fieldVal int, maxVal int, prevVal ...string)string` |
+| eql           |  == op, `eq "hello" "world"` | `eql(fieldVal interface{}, val interface{}, prevVal ...string)string` |
+| set           |  set field value in custom type, output resolves to concrete type in code, `set .Age 25` | `set(typeVal interface{}, fieldTypeVal string, val interface{}, prevVal ...string) string` |
+
+
