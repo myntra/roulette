@@ -2,132 +2,81 @@ package roulette
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/gob"
 	"encoding/xml"
-	"errors"
 	"fmt"
-	"log"
 	"reflect"
-	"sort"
-	"strings"
 	"text/template"
 )
 
-// Parser holds the rules from a rule file
-type Parser struct {
-	Name           xml.Name `xml:"roulette"`
-	Children       []*Rules `xml:"rules"`
-	defaultFuncs   template.FuncMap
-	userfuncs      template.FuncMap
-	sortedChildren map[string]*Rules
-	delimLeft      string
-	delimRight     string
+// default delimeters
+var delimLeft = "<r>"
+var delimRight = "</r>"
+
+// Parser ...
+type Parser interface {
+	Update(data []byte) error
+	Execute(vals interface{})
+	Result() Result
 }
 
-func (p *Parser) compile() {
-	for _, rules := range p.Children {
-		p.sortedChildren[rules.TypeName] = rules
-	}
+// TextTemplateParser holds the rules from a rule file
+type TextTemplateParser struct {
+	Name     xml.Name               `xml:"roulette"`
+	Rulesets []*TextTemplateRuleset `xml:"ruleset"`
 
-	for typeName, rules := range p.sortedChildren {
-
-		for _, rule := range rules.Children {
-			rule.compile(p.delimLeft, p.delimRight, p.defaultFuncs, p.userfuncs)
-		}
-		// sort by rule priority
-		sort.Sort(p.sortedChildren[typeName])
-	}
+	DefaultFuncs template.FuncMap
+	Userfuncs    template.FuncMap
+	DelimLeft    string
+	DelimRight   string
+	RuleResult   Result
+	Get          chan interface{}
 }
 
-// Execute executes all rules in order of priority.
-func (p *Parser) Execute(vals ...interface{}) error {
-	typeName := p.buildMultiTypeName(vals)
-	return p.multiTypesResult(typeName, false, vals)
-}
+// Compile ...
+func (p *TextTemplateParser) Compile() error {
 
-// ExecuteOne executes in order of priority until a high priority rule is successful, after which rule
-// execution stops.
-func (p *Parser) ExecuteOne(vals ...interface{}) error {
-	typeName := p.buildMultiTypeName(vals)
-	return p.multiTypesResult(typeName, true, vals)
-}
+	var _ Ruleset = &TextTemplateRuleset{}
+	for _, ruleset := range p.Rulesets {
 
-func getType(myvar interface{}) string {
-	valueOf := reflect.ValueOf(myvar)
+		ruleset.Result(p.RuleResult)
 
-	if valueOf.Type().Kind() == reflect.Ptr {
-		return reflect.Indirect(valueOf).Type().Name()
-	}
-	return valueOf.Type().Name()
-}
-
-func (p *Parser) buildMultiTypeName(vals interface{}) string {
-	var typeName string
-	for _, v := range vals.([]interface{}) {
-		typeName = typeName + getType(v) + ","
-	}
-	typeName = strings.TrimRight(typeName, ",")
-	return typeName
-}
-
-func (p *Parser) multiTypesResult(typeName string, one bool, vals interface{}) error {
-	rules, ok := p.sortedChildren[typeName]
-	if !ok {
-		return fmt.Errorf("No rules found for types:%s", typeName)
-	}
-
-	if rules.DataKey == "" {
-		return fmt.Errorf("No dataKey found for types:%s", typeName)
-	}
-
-	var tmplData map[string]interface{}
-
-	valsData := make(map[string]interface{})
-	for _, val := range vals.([]interface{}) {
-		valsData[getType(val)] = val
-	}
-
-	tmplData = valsData
-
-	if len(vals.([]interface{})) > 1 {
-		tmplData[rules.DataKey] = valsData
-	}
-
-	for _, rule := range rules.Children {
-		// execute rules
-		if rule.Template == nil {
-			log.Println(errors.New("rule expression not found"))
-			continue
-		}
-
-		var buf bytes.Buffer
-		err := rule.Template.Execute(&buf, tmplData)
+		err := ruleset.Compile(p.DelimLeft, p.DelimRight, p.DefaultFuncs, p.Userfuncs)
 		if err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
 
-		var result bool
-		err = json.Unmarshal(buf.Bytes(), &result)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		// first high priority rule successful, break
-		if result && one {
-			break
-		}
-
+		ruleset.Sort()
 	}
 
 	return nil
 }
 
+// Execute ...
+func (p *TextTemplateParser) Execute(vals interface{}) {
+	for _, ruleset := range p.Rulesets {
+		ruleset.Execute(vals)
+	}
+}
+
+func clone(a, b interface{}) {
+
+	buff := new(bytes.Buffer)
+	enc := gob.NewEncoder(buff)
+	dec := gob.NewDecoder(buff)
+	enc.Encode(a)
+	dec.Decode(b)
+}
+
+// Result ...
+func (p *TextTemplateParser) Result() Result {
+	return p.RuleResult
+}
+
 // AddFuncs allows additional functions to be added to the parser
 // Functions must be of the signature: f(arg1,arg2, prevVal ...string)string
 // See funcmap.go for examples.
-func (p *Parser) AddFuncs(funcMap template.FuncMap) error {
+func (p *TextTemplateParser) AddFuncs(funcMap template.FuncMap) error {
 	for name, fn := range funcMap {
 		if !goodName(name) {
 			return fmt.Errorf("function name %s is not a valid identifier", name)
@@ -139,56 +88,79 @@ func (p *Parser) AddFuncs(funcMap template.FuncMap) error {
 		if !goodFunc(v.Type()) {
 			return fmt.Errorf("can't install method/function %q with %d results", name, v.Type().NumOut())
 		}
-		p.userfuncs[name] = fn
+		p.Userfuncs[name] = fn
 	}
-	p.compile()
 
-	return nil
+	return p.Compile()
 }
 
 // RemoveFuncs removes previously added functions from the parser
-func (p *Parser) RemoveFuncs(funcMap template.FuncMap) {
+func (p *TextTemplateParser) RemoveFuncs(funcMap template.FuncMap) {
 	for k := range funcMap {
-		delete(p.userfuncs, k)
+		delete(p.Userfuncs, k)
 	}
 
-	p.compile()
+	p.Compile()
 }
 
 // Delims sets the custom delimieters for parsing the text/template expression
-func (p *Parser) Delims(left, right string) {
-	p.delimLeft = left
-	p.delimRight = right
-	p.compile()
+func (p *TextTemplateParser) Delims(left, right string) {
+	p.DelimLeft = left
+	p.DelimRight = right
+	p.Compile()
 }
 
 // Update is a wrapper over new for the current parser
 // The method recompiles the templates.
-func (p *Parser) Update(data []byte) error {
-	p, err := New(data)
+func (p *TextTemplateParser) Update(data []byte) error {
+
+	err := xml.Unmarshal(data, p)
 	if err != nil {
 		return err
 	}
+
+	// validate
+	err = p.Compile()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// New returns a new roulette format xml parser
-func New(data []byte) (*Parser, error) {
+// NewTextTemplateParser returns a new roulette format xml parser
+func NewTextTemplateParser(data []byte, result Result) (Parser, error) {
 
-	parser := &Parser{
-		delimLeft:      delimLeft,
-		delimRight:     delimRight,
-		sortedChildren: make(map[string]*Rules),
-		defaultFuncs:   defaultFuncMap,
-		userfuncs:      template.FuncMap{},
+	get := make(chan interface{})
+
+	parser := &TextTemplateParser{
+		DelimLeft:    delimLeft,
+		DelimRight:   delimRight,
+		DefaultFuncs: defaultFuncMap,
+		Userfuncs:    template.FuncMap{},
+		Get:          get,
+		RuleResult:   result,
 	}
 
-	err := xml.Unmarshal(data, parser)
+	err := parser.Update(data)
 	if err != nil {
 		return nil, err
 	}
 
-	parser.compile()
-
 	return parser, nil
+}
+
+// NewSimpleParser ...
+func NewSimpleParser(data []byte) (Parser, error) {
+	return NewTextTemplateParser(data, nil)
+}
+
+// NewCallbackParser ...
+func NewCallbackParser(data []byte, fn func(interface{})) (Parser, error) {
+	return NewTextTemplateParser(data, NewResultCallback(fn))
+}
+
+// NewQueueParser ...
+func NewQueueParser(data []byte) (Parser, error) {
+	return NewTextTemplateParser(data, NewResultQueue())
 }

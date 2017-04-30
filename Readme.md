@@ -12,7 +12,37 @@
 </p>
 
 ---
-### Features:
+<!-- TOC -->
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+    - [Overview](#overview)
+- [Guide](#guide)
+    - [Roulette XML file:](#roulette-xml-file)
+        - [Tags and Attributes](#tags-and-attributes)
+            - [Ruleset](#ruleset)
+            - [Rule](#rule)
+            - [Rule Expressions](#rule-expressions)
+            - [Defining Rules in XML](#defining-rules-in-xml)
+    - [Parsers](#parsers)
+        - [TextTemplateParser](#texttemplateparser)
+    - [Executors](#executors)
+        - [Simple Executor](#simple-executor)
+        - [Callback Executor](#callback-executor)
+        - [Queue Executor](#queue-executor)
+    - [Results](#results)
+        - [Result Callback](#result-callback)
+        - [Result Queue](#result-queue)
+- [XML Tags](#xml-tags)
+- [Defining Rules in XML:](#defining-rules-in-xml)
+- [Builtin Functions](#builtin-functions)
+- [TODO](#todo)
+- [Attributions](#attributions)
+
+<!-- /TOC -->
+
+## Features
 
 - Builtin functions for writing simple rule expressions. 
 - Supports injecting custom functions.
@@ -22,165 +52,209 @@
 
 This pacakge is used for firing business actions based on a textual decision tree. It uses the powerful control structures in `text/template` and xml parsing from `encoding/xml` to build the tree from a `roulette` xml file.
 
-### go get
+## Installation
 ```
 $ go get github.com/myntra/roulette
 ```
 
-### Usage:
+## Usage
+### Overview
 
-From `testrules/rules.xml`
+From `examples/rules.xml`
 
 ```xml
 <roulette>
-    <rules types="Person,Company" dataKey="MyData">        
-        <rule name="setAge" priority="2">
+    <!--filterTypes="T1,T2,T3..."(required) allow one or all of the types for the rules group. * pointer filterting is not done .-->
+    <!--filterStrict=true or false. rules group executed only when all types are present -->
+    <!--prioritiesCount= "1" or "2" or "3"..."all". if 1 then execution stops after "n" top priority rules are executed. "all" executes all the rules.-->
+    <!--dataKey="string" (required) root key from which user data can be accessed. -->
+    <!--resultKey="string" key from which result.put function can be accessed. default value is "result".-->
+
+    <ruleset name="personRules" dataKey="MyData" resultKey="result" filterTypes="types.Person,types.Company" 
+        filterStrict="false" prioritiesCount="all" >
+
+        <rule name="personFilter1" priority="3">
                 <r>with .MyData</r>
                     <r>
-                       ge .Person.Experience 7 |
-                       in .Person.Age 15 30 |
-                       le .Person.Vacations 5 | 
-                       eq .Person.Position "SSE" |
-                       eq .Company.Name "Myntra" | 
-                       .Person.SetAge 25 
+                       le .types.Person.Vacations 5 |
+                       and (gt .types.Person.Experience 6) (in .types.Person.Age 15 30) |
+                       eq .types.Person.Position "SSE" |
+                       .types.Person.SetAge 25
                     </r>
                 <r>end</r>
         </rule>
 
-        <rule name="setSalary" priority="1">
+        <rule name="personFilter2" priority="2">
                 <r>with .MyData</r>
-                    <r>with .Person </r>
-                        <r>
-                             eq .Position "SSE" |
-                            .SetSalary 50000
-                        </r>
-                    <r>end</r>
+                    <r>
+                       le .types.Person.Vacations 5 |
+                       and (gt .types.Person.Experience 6) (in .types.Person.Age 15 30) |
+                       eq .types.Person.Position "SSE"  |
+                       .result.Put .types.Person
+                    </r>
                 <r>end</r>
         </rule>
-    </rules>
+
+        <rule name="personFilter3" priority="1">
+            <r>with .MyData</r>
+                    <r>
+                    le .types.Person.Vacations 5 |
+                    and (gt .types.Person.Experience 6) (in .types.Person.Age 15 30) |
+                    eq .types.Person.Position "SSE"  |
+                    eq .types.Company.Name "Myntra" |
+                     .result.Put .types.Company |
+                    </r>
+            <r>end</r>
+        </rule>
+    </ruleset>
 </roulette>
 ```
 
-#### API:
+From `examples/...`
 
-`parser.Execute` : Applies all matching rules for the types namespace in order of `priority`. 
-
-
-From `examples/person/main.go`
+`simple`
 
 ```go
 ...
-
-// Person ...
-type Person struct {
-	ID         int
-	Age        int
-	Experience int
-	Vacations  int
-	Salary     int
-	Position   string
-}
-
-// SetAge ...
-func (p *Person) SetAge(age int, prevVal ...bool) bool {
-	if !checkPrevVal(prevVal) {
-		return false
-	}
-	p.Age = age
-	return true
-}
-
-// SetSalary ...
-func (p *Person) SetSalary(salary int, prevVal ...bool) bool {
-	if !checkPrevVal(prevVal) {
-		return false
-	}
-	p.Salary = salary
-	return true
-}
-
-// Company ...
-type Company struct {
-	Name string
-}
-
-func main() {
-	p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
-	c := Company{Name: "Myntra"}
-
-	// execute all rules
-	parser := getParser("testrules/rules.xml")
-	err := parser.Execute(&p, &c)
+p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
+	c := types.Company{Name: "Myntra"}
+  // modify the provided object
+	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"))
 	if err != nil {
 		log.Fatal(err)
 	}
-}
 
-....
+	executor := roulette.NewSimpleExecutor(parser)
+	executor.Execute(&p, &c, []string{"hello"}, false, 4, 1.23)
 
+  if p.Age != 25 {
+		log.Fatal("Expected Age to be 25")
+	}
+
+  ...
 ```
 
-`parser.ExecuteOne`: Applies matching rules for the types namespace in order of `priority` until a rule is successful. 
-
+`callback`
 
 ```go
-
-p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
-	c := Company{Name: "Myntra"}
-
-	// execute rules until successful
-	parser := getParser("testrules/rules.xml")
-	err := parser.ExecuteOne(&p, &c)
+...
+count := 0
+	callback := func(vals interface{}) {
+		fmt.Println(vals)
+		count++
+	}
+  // get rule results as callback
+	parser, err := roulette.NewCallbackParser(readFile("../rules.xml"), callback)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	executor := roulette.NewSimpleExecutor(parser)
+	executor.Execute(testValuesCallback...)
+	if count != 2 {
+		log.Fatalf("Expected 2 callbacks, got %d", count)
+	}
+...
+```
+`queue`
+
+```go
+...
+// get rule results on a queue
+	parser, err := roulette.NewQueueParser(readFile("../rules.xml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := roulette.NewQueueExecutor(parser)
+	executor.Execute(in, out)
+
+  //writer
+	go func(in chan interface{}, values []interface{}) {
+
+		for _, v := range values {
+			in <- v
+		}
+
+	}(in, testValuesQueue)
+
+	expectedResults := 2
+
+read:
+	for {
+		select {
+		case v := <-out:
+			expectedResults--
+			fmt.Println(v)
+			switch tv := v.(type) {
+			case types.Person:
+				// do something
+				if !(tv.ID == 4 || tv.ID == 3) {
+					log.Fatal("Unexpected Result", tv)
+				}
+			}
+
+			if expectedResults == 0 {
+				break read
+			}
+
+			if expectedResults < 0 {
+				log.Fatalf("received  %d more results", -1*expectedResults)
+			}
+
+		case <-time.After(time.Second * 5):
+			log.Fatalf("received  %d less results", expectedResults)
+		}
+	}
+
+
+...
 ```
 
-#### XML Tags
+## Guide
+### Roulette XML file: 
+
+
+#### Tags and Attributes 
+##### Ruleset 
+##### Rule
+##### Rule Expressions
+##### Defining Rules in XML
+
+
+### Parsers 
+#### TextTemplateParser
+Right now the package provides a single parser: `TextTemplateParser`. As the name suggests the parser is able to read xml wrapped over a valid `text/template` expression and executes it.
+
+### Executors
+
+#### Simple Executor
+
+#### Callback Executor 
+
+#### Queue Executor 
+
+### Results
+
+#### Result Callback
+#### Result Queue 
+
+## XML Tags
 
 - `roulette` : the root tag.
 
-- `rules`: a types namespaced tag with `rule` children. The attributes `types` and `dataKey` are **required**. `types` value can be a single type or a comma separated list of types. To match `rules` set, atleast one of the types from this list should be given to `parse.Execute` or `parse.ExecuteOne`.
+- `ruleset`: a types namespaced tag with `rule` children. The attributes `filterTypes` and `dataKey` are **required**. `filterTypes` value can be a single type or a comma separated list of types. To match `ruleset` set, atleast one of the types from this list should be given to `parse.Execute` or `parse.ExecuteOne`.
 
 - `rule`: tag which holds the `rule expression`. The attributes `name` and `priority` are **optional**. The default value of `priority` is 0. There is no guarantee for order of execution if `priority` is not set.
 
-
-```xml
-<roulette>
-    <rules types="Person,Company" dataKey="MyData">        
-        <rule name="setAge" priority="2">
-                <r>with .MyData</r>
-                    <r>
-                       le .Person.Vacations 5 |
-                       and (gt .Person.Experience 6) (in .Person.Age 15 30) |
-                       or (eq .Person.Position "SSE") (eq .Company.Name "Myntra") |
-                       .Person.SetAge 25
-                    </r>
-                <r>end</r>
-        </rule>
-
-        <rule name="setSalary" priority="1">
-                <r>with .MyData</r>
-                    <r>with .Person </r>
-                        <r>
-                             eq .Position "SSE" | .SetSalary 50000
-                        </r>
-                    <r>end</r>
-                <r>end</r>
-        </rule>
-    </rules>
-</roulette>
-```
-
-#### Defining Rules in XML:
+## Defining Rules in XML:
 
 - Write valid `text/template` control structures within the `<rule>...</rule>` tag.
 - Namespace rules by custom types. e.g: 
 
-	`<rules types="Person,Company">...</rules>`
+	`<ruleset filterTypes="Person,Company">...</ruleset>`
 
-- Set `priority` of rules within namespace `types`.
+- Set `priority` of rules within namespace `filterTypes`.
 - Add custom functions to the parser using the method `parser.AddFuncs`. The function must have the signature:
 	
 	`func(arg1,...,argN,prevVal ...bool)bool`
@@ -193,7 +267,7 @@ p := Person{ID: 1, Age: 20, Experience: 7, Vacations: 4, Position: "SSE"}
 
 
 
-#### Builtin Functions
+## Builtin Functions
 
 Apart from the built-in functions from `text/template`, the following functions are available.
 
@@ -212,17 +286,18 @@ The idea is to keep the templating language readable and easy to write.
 | not		   | `!op` , e.g.`not 1`|
 | and 		   | `op1 && op2`, e.g. `and (expr1) (expr2)`|
 | or 		   | `op1 // op2`, e.g. `or (expr1) (expr2)`|
+| result.Put   | `result.Put Value` where `result` is the defined `resultKey`|
  
 
 
  - pipe operator | : `Usage: the output of fn1 is the last argument of fn2`, e.g. `fn1 1 2| fn2 1 2 `
 
 
-#### TODO
+## TODO
 - More builtin functions.
 - More tests.
 - More examples: roulette templates and go code.
 - Static checker(?).
 
-#### Attribution
+## Attributions
 The `roulette.png` image is sourced from https://thenounproject.com/term/roulette/143243/ with a CC license.
