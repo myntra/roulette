@@ -1,8 +1,6 @@
 package roulette
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/xml"
 	"fmt"
 	"reflect"
@@ -13,7 +11,7 @@ import (
 var delimLeft = "<r>"
 var delimRight = "</r>"
 
-// Parser ...
+// Parser interface provides methods for the executor to update the tree, execute the values and get result.
 type Parser interface {
 	Update(data []byte) error
 	Execute(vals interface{})
@@ -33,7 +31,7 @@ type TextTemplateParser struct {
 	Get          chan interface{}
 }
 
-// Compile ...
+// Compile compiles the parser's rulesets
 func (p *TextTemplateParser) Compile() error {
 
 	var _ Ruleset = &TextTemplateRuleset{}
@@ -52,23 +50,14 @@ func (p *TextTemplateParser) Compile() error {
 	return nil
 }
 
-// Execute ...
+// Execute executes the parser's rulesets
 func (p *TextTemplateParser) Execute(vals interface{}) {
 	for _, ruleset := range p.Rulesets {
 		ruleset.Execute(vals)
 	}
 }
 
-func clone(a, b interface{}) {
-
-	buff := new(bytes.Buffer)
-	enc := gob.NewEncoder(buff)
-	dec := gob.NewDecoder(buff)
-	enc.Encode(a)
-	dec.Decode(b)
-}
-
-// Result ...
+// Result returns the parser's result.
 func (p *TextTemplateParser) Result() Result {
 	return p.RuleResult
 }
@@ -150,17 +139,17 @@ func NewTextTemplateParser(data []byte, result Result) (Parser, error) {
 	return parser, nil
 }
 
-// NewSimpleParser ...
+// NewSimpleParser returns a TextTemplateParser with a nil Result.
 func NewSimpleParser(data []byte) (Parser, error) {
 	return NewTextTemplateParser(data, nil)
 }
 
-// NewCallbackParser ...
+// NewCallbackParser returns a TextTemplateParser with a new ResultCallback
 func NewCallbackParser(data []byte, fn func(interface{})) (Parser, error) {
 	return NewTextTemplateParser(data, NewResultCallback(fn))
 }
 
-// NewQueueParser ...
+// NewQueueParser returns a TextTemplateParser with a new ResultQueue.
 func NewQueueParser(data []byte) (Parser, error) {
 	return NewTextTemplateParser(data, NewResultQueue())
 }

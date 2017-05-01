@@ -21,21 +21,20 @@
 - [Guide](#guide)
     - [Roulette XML file:](#roulette-xml-file)
         - [Tags and Attributes](#tags-and-attributes)
+            - [Roulette](#roulette)
             - [Ruleset](#ruleset)
             - [Rule](#rule)
             - [Rule Expressions](#rule-expressions)
-            - [Defining Rules in XML](#defining-rules-in-xml)
+        - [Defining Rules in XML](#defining-rules-in-xml)
     - [Parsers](#parsers)
         - [TextTemplateParser](#texttemplateparser)
-    - [Executors](#executors)
-        - [Simple Executor](#simple-executor)
-        - [Callback Executor](#callback-executor)
-        - [Queue Executor](#queue-executor)
     - [Results](#results)
-        - [Result Callback](#result-callback)
-        - [Result Queue](#result-queue)
-- [XML Tags](#xml-tags)
-- [Defining Rules in XML:](#defining-rules-in-xml)
+        - [ResultCallback](#resultcallback)
+        - [ResultQueue](#resultqueue)
+    - [Executors](#executors)
+        - [SimpleExecutor](#simpleexecutor)
+            - [SimpleExecutor with Callback](#simpleexecutor-with-callback)
+        - [QueueExecutor](#queueexecutor)
 - [Builtin Functions](#builtin-functions)
 - [TODO](#todo)
 - [Attributions](#attributions)
@@ -214,40 +213,45 @@ read:
 ## Guide
 ### Roulette XML file: 
 
+#### Tags and Attributes
 
-#### Tags and Attributes 
-##### Ruleset 
+##### Roulette
+  
+  `roulette` is the root tag of the xml. It could contain a list of `ruleset` tags. 
+
+##### Ruleset
+
+`ruleset`: a types namespaced tag with `rule` children. The attributes `filterTypes` and `dataKey` are **required**. To match `ruleset` , atleast one of the types from this list should be an input for the executor. 
+
+`Attributes`: 
+
+- `filterTypes`: "T1,T2,T3..."(required) allow one or all of the types for the rules group. * pointer filterting is not done.
+
+- `filterStrict`: true or false. rules group executed only when all types are present.
+
+- `prioritiesCount`: "1" or "2" or "3"..."all". if 1 then execution stops after "n" top priority rules are executed. "all" executes all the rules
+
+- `dataKey`: "string" (required) root key from which user data can be accessed.
+
+- `resultKey`: "string" key from which result.put function can be accessed. default value is "result".
+
+
 ##### Rule
+
+The tag which holds the `rule expression`. The attributes `name` and `priority` are **optional**. The default value of `priority` is 0. There is no guarantee for order of execution if `priority` is not set.
+
+`Attributes`:
+
+- `name`: name of the rule.
+
+- `priority`: priority rank of the rule within the ruleset. 
+
+
 ##### Rule Expressions
-##### Defining Rules in XML
 
+Valid `text/template` expression. The delimeters can be changed from the default `<r></r>` using the parse api.
 
-### Parsers 
-#### TextTemplateParser
-Right now the package provides a single parser: `TextTemplateParser`. As the name suggests the parser is able to read xml wrapped over a valid `text/template` expression and executes it.
-
-### Executors
-
-#### Simple Executor
-
-#### Callback Executor 
-
-#### Queue Executor 
-
-### Results
-
-#### Result Callback
-#### Result Queue 
-
-## XML Tags
-
-- `roulette` : the root tag.
-
-- `ruleset`: a types namespaced tag with `rule` children. The attributes `filterTypes` and `dataKey` are **required**. `filterTypes` value can be a single type or a comma separated list of types. To match `ruleset` set, atleast one of the types from this list should be given to `parse.Execute` or `parse.ExecuteOne`.
-
-- `rule`: tag which holds the `rule expression`. The attributes `name` and `priority` are **optional**. The default value of `priority` is 0. There is no guarantee for order of execution if `priority` is not set.
-
-## Defining Rules in XML:
+#### Defining Rules in XML
 
 - Write valid `text/template` control structures within the `<rule>...</rule>` tag.
 - Namespace rules by custom types. e.g: 
@@ -265,6 +269,72 @@ Right now the package provides a single parser: `TextTemplateParser`. As the nam
 - The pipe `|` operator takes a previously evaluated value and passes it to the next function as the last argument.
 - For more information on go templating: [text/template](https://golang.org/pkg/text/template/)
 
+
+### Parsers
+
+#### TextTemplateParser
+Right now the package provides a single parser: `TextTemplateParser`. As the name suggests the parser is able to read xml wrapped over a valid `text/template` expression and executes it.
+
+
+### Results
+
+Types which implements the `roulette.Result`. If a parser is initalised with a `Result` type, rule expressions with `result.Put` become valid. `result.Put` function accepts an `interface{}` type as a parameter.
+
+#### ResultCallback
+
+`roulette.ResultCallback`: An implementation of the `roulette.Result` interface which callbacks the provided function with `result.Put` value.
+
+#### ResultQueue 
+
+`roulette.ResultQueue`: An implementation of the `roulette.Result` interface which puts the value received from `result.Put` on a channel.
+
+### Executors
+
+An executor takes a parser and tests an incoming values against the rulesets. Executors implement the `roulette.Execute` interface. The result is then caught by a struct which implements the `roulette.Result` interface. 
+
+#### SimpleExecutor
+
+A simple implementation of the `roulette.SimpleExecute` interface which has a `parser` with  `nil` `Result` set. This is mainly used to directly modify the input object. The executor ignores rule expressions which contain `result.Put`.
+
+```go
+
+parser,err := NewTextTemplateParser(data, nil)
+// or parser, err := roulette.NewSimpleParser(data,nil)
+executor := roulette.NewSimpleExecutor(parser)
+executor.Execute(t1,t2)
+```
+
+##### SimpleExecutor with Callback
+
+An implementation of the `roulette.SimpleExecute` interface. which accepts a parser initialized with `roulette.ResultCallback`.
+
+```go
+
+parser,err := NewTextTemplateParser(data, NewResultCallback(fn)))
+// or parser, err := roulette.NewCallbackParser(data,fn)
+executor := roulette.NewSimpleExecutor(parser)
+executor.Execute(t1,t2)
+
+```
+
+#### QueueExecutor 
+
+An implementation of the `roulette.QueueExecute` interface. which accepts the `roulette.ResultQueue` type. The `Execute` method expects an input and an output channel to write values and read results respectively. 
+
+```go
+
+parser,err := NewTextTemplateParser(data, NewResultQueue())
+// or parser, err := roulette.NewQueueParser(data)
+executor := roulette.NewQueueExecutor(parser)
+
+in := make(chan interface{})
+out := make(chan interface{})
+
+executor.Execute(in, out)
+
+```
+
+For concrete examples of the above please see the `examples` directory. 
 
 
 ## Builtin Functions
@@ -294,6 +364,7 @@ The idea is to keep the templating language readable and easy to write.
 
 
 ## TODO
+- Log levels
 - More builtin functions.
 - More tests.
 - More examples: roulette templates and go code.

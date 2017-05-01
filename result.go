@@ -1,6 +1,6 @@
 package roulette
 
-// Result ...
+// Result interface provides methods to get/put an interface{} value from a rule.
 type Result interface {
 	Put(val interface{}, prevVal bool) bool
 	Get() interface{}
@@ -21,12 +21,12 @@ func (q *ResultCallback) Put(val interface{}, prevVal bool) bool {
 	return true
 }
 
-// Get ...
+// Get the callback function.
 func (q *ResultCallback) Get() interface{} {
 	return q.fn
 }
 
-// NewResultCallback ...
+// NewResultCallback return a new ResultCallback
 func NewResultCallback(fn func(interface{})) *ResultCallback {
 	return &ResultCallback{fn: fn}
 }
@@ -67,7 +67,7 @@ func (q *ResultQueue) block() {
 	}
 }
 
-// NewResultQueue ...
+// NewResultQueue returns a new ResultQueue
 func NewResultQueue() *ResultQueue {
 	q := &ResultQueue{get: make(chan interface{})}
 	go q.block()

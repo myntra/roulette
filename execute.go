@@ -2,19 +2,19 @@ package roulette
 
 import "fmt"
 
-// SimpleExecute ...
+// SimpleExecute interface provides methods to retreive a parser and a method which executes on the incoming values.
 type SimpleExecute interface {
 	RuleParser() Parser
 	Execute(vals ...interface{}) error
 }
 
-// QueueExecute ...
+// QueueExecute interface provides methods to retreive a parser and a method which executes on the incoming values on the input channel.
 type QueueExecute interface {
 	RuleParser() Parser
-	Execute(in <-chan interface{}, out chan<- interface{})
+	Execute(in <-chan interface{}, out chan<- interface{}) // in channel to write, out channel to read.
 }
 
-// SimpleExecutor ...
+// SimpleExecutor implements the SimpleExecute interface
 type SimpleExecutor struct {
 	Parser Parser
 }
@@ -31,7 +31,7 @@ func (s *SimpleExecutor) Execute(vals ...interface{}) error {
 	return nil
 }
 
-// QueueExecutor ...
+// QueueExecutor implements the QueueExecute
 type QueueExecutor struct {
 	Parser Parser
 }
@@ -131,12 +131,12 @@ recv:
 
 }
 
-// NewSimpleExecutor ...
+// NewSimpleExecutor returns a new SimpleExecutor
 func NewSimpleExecutor(parser Parser) SimpleExecute {
 	return &SimpleExecutor{Parser: parser}
 }
 
-// NewQueueExecutor ...
+// NewQueueExecutor returns a new QueueExecutor
 func NewQueueExecutor(parser Parser) QueueExecute {
 	return &QueueExecutor{Parser: parser}
 }
