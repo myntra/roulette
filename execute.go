@@ -2,13 +2,13 @@ package roulette
 
 import "fmt"
 
-// SimpleExecute interface provides methods to retreive a parser and a method which executes on the incoming values.
+// SimpleExecute interface provides methods to retrieve a parser and a method which executes on the incoming values.
 type SimpleExecute interface {
 	RuleParser() Parser
 	Execute(vals ...interface{}) error
 }
 
-// QueueExecute interface provides methods to retreive a parser and a method which executes on the incoming values on the input channel.
+// QueueExecute interface provides methods to retrieve a parser and a method which executes on the incoming values on the input channel.
 type QueueExecute interface {
 	RuleParser() Parser
 	Execute(in <-chan interface{}, out chan<- interface{}) // in channel to write, out channel to read.

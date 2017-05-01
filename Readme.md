@@ -290,7 +290,7 @@ Types which implements the `roulette.Result`. If a parser is initalised with a `
 
 ### Executors
 
-An executor takes a parser and tests an incoming values against the rulesets. Executors implement the `roulette.Execute` interface. The result is then caught by a struct which implements the `roulette.Result` interface. 
+An executor takes a parser and tests an incoming values against the rulesets. Executors implement the `roulette.SimpleExecute` and `roulette.QueueExecute` interfaces. The result is then caught by a struct which implements the `roulette.Result` interface. 
 
 #### SimpleExecutor
 
