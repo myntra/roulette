@@ -5,9 +5,30 @@
         <rule name="setA" priority="1">
                 <r>with .TestData</r>
                     <r>
-                       .roulette.T1.SetA 5
+                        .roulette.T1.SetA 5
                     </r>
                 <r>end</r>
+        </rule>
+        <rule name="packageMissingFromType">
+            <r>with .TestData</r>
+                <r>
+                    .T1.SetA 10
+                </r>
+            <r>end</r>
+        </rule>
+        <rule name="invalidType" >
+            <r>with .TestData</r>
+                <r>
+                    eq .roulette.T2.A 1 | .roulette.T1.SetA 5
+                </r>
+            <r>end</r>
+        </rule>
+        <rule name="unexpectedExpression">
+            <r>with .TestData</r>
+                <r>
+                  (2 > 1) | .roulette.T1.SetA 5
+                </r>
+            <r>end</r>
         </rule>
     </ruleset>
 </roulette>

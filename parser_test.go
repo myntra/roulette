@@ -1,7 +1,6 @@
 package roulette
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -40,12 +39,12 @@ type T struct {
 
 //SetA ...
 func (t *T) SetA(a int, prevVal ...bool) bool {
+	//	fmt.Println("SetA", a, prevVal)
 	if len(prevVal) > 0 {
 		if !prevVal[0] {
 			return false
 		}
 	}
-	fmt.Println(a)
 	t.A = a
 	return true
 
@@ -104,14 +103,16 @@ var simpleParseTestCases = []SimpleParseTestCase{
 			A:           1,
 			B:           2,
 			XML:         "testrules/rules_simple_1.xml",
-			TestName:    "TestT1SetA",
+			TestName:    "TestT1SetA ",
 			Description: "Expects T1.A to be 5",
 			ExpectFunc: func(val interface{}) bool {
 				t, ok := val.(*T1)
+				//fmt.Println("ExpectFunc", val, reflect.TypeOf(val))
 				if !ok {
 					log.Println("expected val to be T1")
 					return false
 				}
+				//	fmt.Println("ExpectFunc", t.A)
 				if t.A != 5 {
 					return false
 				}

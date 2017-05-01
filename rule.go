@@ -343,6 +343,7 @@ func (r *TextTemplateRuleset) Execute(vals interface{}) {
 	for _, rule := range r.Rules {
 
 		// validate if one of the types exist in the expression.
+		// log.Printf("test rule %s", rule.Name)
 
 		err := rule.isValid(types)
 		if err != nil {
@@ -353,7 +354,7 @@ func (r *TextTemplateRuleset) Execute(vals interface{}) {
 		t, err := template.New(rule.Name).Delims(rule.delimLeft, rule.delimRight).Funcs(rule.allfuncs).Parse(rule.Expr)
 		if err != nil {
 			log.Printf("invalid rule %s, error: %v", rule.Name, err)
-			return
+			continue
 		}
 
 		var buf bytes.Buffer
@@ -362,6 +363,8 @@ func (r *TextTemplateRuleset) Execute(vals interface{}) {
 			log.Printf("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
+
+		log.Printf("matched rule %s", rule.Name)
 
 		var result bool
 		err = json.Unmarshal(buf.Bytes(), &result)
