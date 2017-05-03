@@ -5,6 +5,7 @@
   <p align="center">A text/template based package which triggers actions from rules defined in an xml file.</p>
   <p align="center">
   	<img src="http://badges.github.io/stability-badges/dist/experimental.svg"/>
+    <a href='https://coveralls.io/github/myntra/roulette?branch=master'><img src='https://coveralls.io/repos/github/myntra/roulette/badge.svg?branch=master' alt='Coverage Status' /></a>
     <a href="https://travis-ci.org/myntra/roulette"><img src="https://travis-ci.org/myntra/roulette.svg?branch=master"></a>
     <a href="https://godoc.org/github.com/myntra/roulette"><img src="https://godoc.org/github.com/myntra/roulette?status.svg"></a>
     <a href="https://goreportcard.com/report/github.com/myntra/roulette"><img src="https://goreportcard.com/badge/github.com/myntra/roulette"></a>
