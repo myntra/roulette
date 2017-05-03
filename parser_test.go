@@ -170,9 +170,9 @@ var matchers = []struct {
 	matcher     string
 	expectedVal int
 }{
-	{"ipl*", 10},
-	{"summer*", 20},
-	{"", 20},
+	{"ipl*", 10},    // should match 1
+	{"summer*", 20}, // should match 1
+	{"", 20},        // should match all
 }
 
 func TestRulesetMatcher(t *testing.T) {
