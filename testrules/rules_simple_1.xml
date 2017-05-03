@@ -23,10 +23,10 @@
                 </r>
             <r>end</r>
         </rule>
-        <rule name="unexpectedExpression">
+        <rule name="malformedExpression" >
             <r>with .TestData</r>
                 <r>
-                  (2 > 1) | .roulette.T1.SetA 5
+                  (2 >1)| .roulette.T1.SetA 5
                 </r>
             <r>end</r>
         </rule>

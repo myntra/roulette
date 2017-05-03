@@ -28,7 +28,7 @@ func main() {
 	p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
 	c := types.Company{Name: "Myntra"}
 
-	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"))
+	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"), "")
 	if err != nil {
 		log.Fatal(err)
 	}

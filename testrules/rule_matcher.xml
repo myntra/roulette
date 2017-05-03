@@ -1,0 +1,24 @@
+<roulette>
+    <ruleset name="t1rules1" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="all" matcher="iplsale">
+
+        <rule name="setA">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T2.SetA 10
+                    </r>
+                <r>end</r>
+        </rule>
+      </ruleset>
+
+    <ruleset name="t1rules2" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="all" matcher="summersale">
+        <rule name="setA" >
+            <r>with .TestData</r>
+                <r>
+                    .roulette.T2.SetA 20
+                </r>
+            <r>end</r>
+        </rule>
+    </ruleset>
+</roulette>

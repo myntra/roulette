@@ -1,0 +1,14 @@
+<roulette>
+    <ruleset name="simpleParserTestRules" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="all" >
+
+        <rule name="setA" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T20.SetA 5 |
+                        .roulette.T21.SetA 10 
+                    </r>
+                <r>end</r>
+        </rule>
+    </ruleset>
+</roulette>

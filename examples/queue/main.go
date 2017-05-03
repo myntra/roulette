@@ -46,7 +46,7 @@ func main() {
 	out := make(chan interface{})
 
 	// get rule results on a queue
-	parser, err := roulette.NewQueueParser(readFile("../rules.xml"))
+	parser, err := roulette.NewQueueParser(readFile("../rules.xml"), "")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -39,7 +39,7 @@ type T struct {
 
 //SetA ...
 func (t *T) SetA(a int, prevVal ...bool) bool {
-	//	fmt.Println("SetA", a, prevVal)
+	//fmt.Println("SetA", a, prevVal)
 	if len(prevVal) > 0 {
 		if !prevVal[0] {
 			return false
@@ -77,12 +77,12 @@ func (t *T1) Parse() {
 	var err error
 
 	if t.Callback != nil {
-		parser, err = NewCallbackParser(readFile(t.XML), t.Callback)
+		parser, err = NewCallbackParser(readFile(t.XML), t.Callback, "")
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		parser, err = NewSimpleParser(readFile(t.XML))
+		parser, err = NewSimpleParser(readFile(t.XML), "")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -107,7 +107,7 @@ var simpleParseTestCases = []SimpleParseTestCase{
 			Description: "Expects T1.A to be 5",
 			ExpectFunc: func(val interface{}) bool {
 				t, ok := val.(*T1)
-				//fmt.Println("ExpectFunc", val, reflect.TypeOf(val))
+				//	fmt.Println("ExpectFunc", val, reflect.TypeOf(val))
 				if !ok {
 					log.Println("expected val to be T1")
 					return false
@@ -121,10 +121,6 @@ var simpleParseTestCases = []SimpleParseTestCase{
 	},
 }
 
-// test xml: tags and attributes, malformed etc.
-// test template: valid for types, malformed etc.
-// test parsers and executors: types, nil values etc.
-
 func TestSimpleParser(tt *testing.T) {
 	for _, testcase := range simpleParseTestCases {
 		testcase.Parse()
@@ -133,4 +129,68 @@ func TestSimpleParser(tt *testing.T) {
 			log.Fatal(testcase.Name(), testcase.Desc())
 		}
 	}
+}
+
+type T2 struct {
+	A int
+	B int
+}
+
+//SetA ...
+func (t *T2) SetA(a int, prevVal ...bool) bool {
+	//	fmt.Println("SetA", a, prevVal)
+	if len(prevVal) > 0 {
+		if !prevVal[0] {
+			return false
+		}
+	}
+	t.A = a
+	return true
+
+}
+
+func TestArraySameType(t *testing.T) {
+	t21 := &T2{A: 1, B: 2}
+	t22 := &T2{A: 1, B: 2}
+
+	parser, err := NewSimpleParser(readFile("testrules/rule_array_same_type.xml"), "")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := NewSimpleExecutor(parser)
+	executor.Execute(t21, t22)
+
+	if t21.A != 5 {
+		log.Fatal("Expected value to be 5")
+	}
+}
+
+var matchers = []struct {
+	matcher     string
+	expectedVal int
+}{
+	{"ipl*", 10},
+	{"summer*", 20},
+	{"", 20},
+}
+
+func TestRulesetMatcher(t *testing.T) {
+
+	for _, v := range matchers {
+		t21 := &T2{A: 1, B: 2}
+		parser, err := NewSimpleParser(readFile("testrules/rule_matcher.xml"), v.matcher)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		executor := NewSimpleExecutor(parser)
+		executor.Execute(t21)
+
+		if t21.A != v.expectedVal {
+			log.Fatalf("Expected value to be %d got %d", v.expectedVal, t21.A)
+		}
+
+	}
+
 }

@@ -143,7 +143,7 @@ count := 0
 		count++
 	}
   // get rule results as callback
-	parser, err := roulette.NewCallbackParser(readFile("../rules.xml"), callback)
+	parser, err := roulette.NewCallbackParser(readFile("../rules.xml",""), callback)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -160,7 +160,7 @@ count := 0
 ```go
 ...
 // get rule results on a queue
-	parser, err := roulette.NewQueueParser(readFile("../rules.xml"))
+	parser, err := roulette.NewQueueParser(readFile("../rules.xml"),"")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -298,8 +298,8 @@ A simple implementation of the `roulette.SimpleExecute` interface which has a `p
 
 ```go
 
-parser,err := NewTextTemplateParser(data, nil)
-// or parser, err := roulette.NewSimpleParser(data,nil)
+parser,err := NewTextTemplateParser(data, nil,"")
+// or parser, err := roulette.NewSimpleParser(data,nil,"")
 executor := roulette.NewSimpleExecutor(parser)
 executor.Execute(t1,t2)
 ```
@@ -310,8 +310,8 @@ An implementation of the `roulette.SimpleExecute` interface. which accepts a par
 
 ```go
 
-parser,err := NewTextTemplateParser(data, NewResultCallback(fn)))
-// or parser, err := roulette.NewCallbackParser(data,fn)
+parser,err := NewTextTemplateParser(data, NewResultCallback(fn)),"")
+// or parser, err := roulette.NewCallbackParser(data,fn,"")
 executor := roulette.NewSimpleExecutor(parser)
 executor.Execute(t1,t2)
 
@@ -323,8 +323,8 @@ An implementation of the `roulette.QueueExecute` interface. which accepts the `r
 
 ```go
 
-parser,err := NewTextTemplateParser(data, NewResultQueue())
-// or parser, err := roulette.NewQueueParser(data)
+parser,err := NewTextTemplateParser(data, NewResultQueue(),"")
+// or parser, err := roulette.NewQueueParser(data,"")
 executor := roulette.NewQueueExecutor(parser)
 
 in := make(chan interface{})

@@ -366,6 +366,10 @@ func within(arg1, arg2, arg3 reflect.Value, arg4 ...reflect.Value) (bool, error)
 	return greaterOrEqual && lessOrEqual, nil
 }
 
+func diff(arg1, arg2 int, prevVal ...bool) int {
+	return arg1 - arg2
+}
+
 var defaultFuncMap = template.FuncMap{
 	"in": within,
 	// Comparisons

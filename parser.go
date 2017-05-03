@@ -27,6 +27,7 @@ type TextTemplateParser struct {
 	Userfuncs    template.FuncMap
 	DelimLeft    string
 	DelimRight   string
+	Pattern      string
 	RuleResult   Result
 	Get          chan interface{}
 }
@@ -39,7 +40,7 @@ func (p *TextTemplateParser) Compile() error {
 
 		ruleset.Result(p.RuleResult)
 
-		err := ruleset.Compile(p.DelimLeft, p.DelimRight, p.DefaultFuncs, p.Userfuncs)
+		err := ruleset.Compile(p.DelimLeft, p.DelimRight, p.Pattern, p.DefaultFuncs, p.Userfuncs)
 		if err != nil {
 			return err
 		}
@@ -118,7 +119,7 @@ func (p *TextTemplateParser) Update(data []byte) error {
 }
 
 // NewTextTemplateParser returns a new roulette format xml parser
-func NewTextTemplateParser(data []byte, result Result) (Parser, error) {
+func NewTextTemplateParser(data []byte, result Result, pattern string) (Parser, error) {
 
 	get := make(chan interface{})
 
@@ -128,6 +129,7 @@ func NewTextTemplateParser(data []byte, result Result) (Parser, error) {
 		DefaultFuncs: defaultFuncMap,
 		Userfuncs:    template.FuncMap{},
 		Get:          get,
+		Pattern:      pattern,
 		RuleResult:   result,
 	}
 
@@ -140,16 +142,16 @@ func NewTextTemplateParser(data []byte, result Result) (Parser, error) {
 }
 
 // NewSimpleParser returns a TextTemplateParser with a nil Result.
-func NewSimpleParser(data []byte) (Parser, error) {
-	return NewTextTemplateParser(data, nil)
+func NewSimpleParser(data []byte, pattern string) (Parser, error) {
+	return NewTextTemplateParser(data, nil, pattern)
 }
 
 // NewCallbackParser returns a TextTemplateParser with a new ResultCallback
-func NewCallbackParser(data []byte, fn func(interface{})) (Parser, error) {
-	return NewTextTemplateParser(data, NewResultCallback(fn))
+func NewCallbackParser(data []byte, fn func(interface{}), pattern string) (Parser, error) {
+	return NewTextTemplateParser(data, NewResultCallback(fn), pattern)
 }
 
 // NewQueueParser returns a TextTemplateParser with a new ResultQueue.
-func NewQueueParser(data []byte) (Parser, error) {
-	return NewTextTemplateParser(data, NewResultQueue())
+func NewQueueParser(data []byte, pattern string) (Parser, error) {
+	return NewTextTemplateParser(data, NewResultQueue(), pattern)
 }

@@ -37,7 +37,7 @@ func main() {
 		count++
 	}
 
-	parser, err := roulette.NewCallbackParser(readFile("../rules.xml"), callback)
+	parser, err := roulette.NewCallbackParser(readFile("../rules.xml"), callback, "")
 	if err != nil {
 		log.Fatal(err)
 	}

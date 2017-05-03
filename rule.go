@@ -15,7 +15,7 @@ import (
 // Ruleset ...
 type Ruleset interface {
 	Execute(vals interface{})
-	Compile(left, right string, defaultfuncs, userfuncs template.FuncMap) error
+	Compile(left, right, pattern string, defaultfuncs, userfuncs template.FuncMap) error
 	Result(result Result)
 	Sort()
 }
@@ -106,7 +106,9 @@ type TextTemplateRuleset struct {
 	ResultKey       string  `xml:"resultKey,attr"`
 	Rules           []*Rule `xml:"rule"`
 	PrioritiesCount string  `xml:"prioritiesCount"`
+	Matcher         string  `xml:"matcher,attr"`
 
+	pattern        string
 	result         Result
 	filterTypesArr []string
 }
@@ -186,6 +188,8 @@ func (r *TextTemplateRuleset) getTemplateData(vals interface{}) map[string]inter
 	// dataKey
 	tmplData := make(map[string]interface{})
 	valsData := make(map[string]interface{})
+	// index array of same types
+	typeArrayIndex := make(map[string]int)
 
 	switch vals.(type) {
 	case map[string]interface{}:
@@ -219,7 +223,21 @@ func (r *TextTemplateRuleset) getTemplateData(vals interface{}) map[string]inter
 				pkgPaths := strings.Split(typeName, ".")
 				//fmt.Println("getTemplateData: case []interface{}: ", i, pkgPaths)
 
-				nestedMap[pkgPaths[len(pkgPaths)-1]] = val
+				pkgTypeName := pkgPaths[len(pkgPaths)-1]
+				indexPkgTypeName := pkgTypeName
+
+				_, ok := typeArrayIndex[pkgTypeName]
+				if !ok {
+					typeArrayIndex[pkgTypeName] = 0
+					nestedMap[pkgTypeName] = val
+
+				} else {
+					typeArrayIndex[pkgTypeName]++
+				}
+
+				indexPkgTypeName = pkgTypeName + strconv.Itoa(typeArrayIndex[pkgTypeName])
+				nestedMap[indexPkgTypeName] = val
+
 				packagePath := ""
 				for _, p := range pkgPaths[:len(pkgPaths)-1] {
 					packagePath = packagePath + p
@@ -264,7 +282,8 @@ func (r *TextTemplateRuleset) getLimit() int {
 }
 
 // Compile ...
-func (r *TextTemplateRuleset) Compile(left, right string, defaultfuncs, userfuncs template.FuncMap) error {
+func (r *TextTemplateRuleset) Compile(left, right, pattern string, defaultfuncs, userfuncs template.FuncMap) error {
+	r.pattern = pattern
 	if r.FilterTypes == "" {
 		return fmt.Errorf("Missing required attribute filterTypes")
 	}
@@ -325,6 +344,12 @@ func (r *TextTemplateRuleset) Sort() {
 
 // Execute ...
 func (r *TextTemplateRuleset) Execute(vals interface{}) {
+	if len(r.pattern) > 0 && len(r.Matcher) > 0 {
+		if !wildcardMatcher(r.Matcher, r.pattern) {
+			log.Printf("ruleset %s is not valid for the current parser %s %s", r.Name, r.Matcher, r.pattern)
+			return
+		}
+	}
 
 	types := r.getTypes(vals)
 	sort.Strings(types)
@@ -369,7 +394,7 @@ func (r *TextTemplateRuleset) Execute(vals interface{}) {
 		var result bool
 		err = json.Unmarshal(buf.Bytes(), &result)
 		if err != nil {
-			log.Println(err)
+			log.Println("marhsal result error", err, buf.String(), tmplData)
 			continue
 		}
 
