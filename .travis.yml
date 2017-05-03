@@ -6,9 +6,6 @@ go:
 before_install:
   - go get github.com/mattn/goveralls
 
-script:
-  - $HOME/gopath/bin/goveralls -service=travis-ci
-
 os:
   - linux
   - osx
@@ -18,7 +15,7 @@ install:
 
 script:
   - go build -v .
-  - go test -v ./
+  - $HOME/gopath/bin/goveralls -service=travis-ci
 
 notifications:
   email:
