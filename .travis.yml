@@ -15,7 +15,7 @@ install:
 
 script:
   - go build -v .
-  - $HOME/gopath/bin/goveralls -service=travis-ci
+  - $HOME/gopath/bin/goveralls -package "github.com/myntra/roulette" -service=travis-ci
 
 notifications:
   email:
