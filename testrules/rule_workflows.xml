@@ -1,6 +1,6 @@
 <roulette>
     <ruleset name="t1rules1" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
-        filterStrict="false" prioritiesCount="all" matcher="iplsale">
+        filterStrict="false" prioritiesCount="all" workflow="iplsale">
 
         <rule name="setA">
                 <r>with .TestData</r>
@@ -12,7 +12,7 @@
       </ruleset>
 
     <ruleset name="t1rules2" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
-        filterStrict="false" prioritiesCount="all" matcher="summersale">
+        filterStrict="false" prioritiesCount="all" workflow="summersale">
         <rule name="setA" >
             <r>with .TestData</r>
                 <r>

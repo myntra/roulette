@@ -23,13 +23,13 @@ type TextTemplateParser struct {
 	Name     xml.Name               `xml:"roulette"`
 	Rulesets []*TextTemplateRuleset `xml:"ruleset"`
 
-	DefaultFuncs template.FuncMap
-	Userfuncs    template.FuncMap
-	DelimLeft    string
-	DelimRight   string
-	Pattern      string
-	RuleResult   Result
-	Get          chan interface{}
+	DefaultFuncs    template.FuncMap
+	Userfuncs       template.FuncMap
+	DelimLeft       string
+	DelimRight      string
+	WorkflowPattern string // filter rulesets based on the pattern
+	RuleResult      Result
+	Get             chan interface{}
 }
 
 // Compile compiles the parser's rulesets
@@ -40,7 +40,7 @@ func (p *TextTemplateParser) Compile() error {
 
 		ruleset.Result(p.RuleResult)
 
-		err := ruleset.Compile(p.DelimLeft, p.DelimRight, p.Pattern, p.DefaultFuncs, p.Userfuncs)
+		err := ruleset.Compile(p.DelimLeft, p.DelimRight, p.WorkflowPattern, p.DefaultFuncs, p.Userfuncs)
 		if err != nil {
 			return err
 		}
@@ -118,19 +118,19 @@ func (p *TextTemplateParser) Update(data []byte) error {
 	return nil
 }
 
-// NewTextTemplateParser returns a new roulette format xml parser
-func NewTextTemplateParser(data []byte, result Result, pattern string) (Parser, error) {
+// NewTextTemplateParser returns a new roulette format xml parser.
+func NewTextTemplateParser(data []byte, result Result, workflowPattern string) (Parser, error) {
 
 	get := make(chan interface{})
 
 	parser := &TextTemplateParser{
-		DelimLeft:    delimLeft,
-		DelimRight:   delimRight,
-		DefaultFuncs: defaultFuncMap,
-		Userfuncs:    template.FuncMap{},
-		Get:          get,
-		Pattern:      pattern,
-		RuleResult:   result,
+		DelimLeft:       delimLeft,
+		DelimRight:      delimRight,
+		DefaultFuncs:    defaultFuncMap,
+		Userfuncs:       template.FuncMap{},
+		Get:             get,
+		WorkflowPattern: workflowPattern,
+		RuleResult:      result,
 	}
 
 	err := parser.Update(data)

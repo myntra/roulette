@@ -166,20 +166,20 @@ func TestArraySameType(t *testing.T) {
 	}
 }
 
-var matchers = []struct {
-	matcher     string
-	expectedVal int
+var workflowPatterns = []struct {
+	workflowPattern string
+	expectedVal     int
 }{
 	{"ipl*", 10},    // should match 1
 	{"summer*", 20}, // should match 1
 	{"", 20},        // should match all
 }
 
-func TestRulesetMatcher(t *testing.T) {
+func TestRulesetWorflow(t *testing.T) {
 
-	for _, v := range matchers {
+	for _, v := range workflowPatterns {
 		t21 := &T2{A: 1, B: 2}
-		parser, err := NewSimpleParser(readFile("testrules/rule_matcher.xml"), v.matcher)
+		parser, err := NewSimpleParser(readFile("testrules/rule_workflows.xml"), v.workflowPattern)
 		if err != nil {
 			log.Fatal(err)
 		}

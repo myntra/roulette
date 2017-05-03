@@ -68,9 +68,10 @@ From `examples/rules.xml`
     <!--prioritiesCount= "1" or "2" or "3"..."all". if 1 then execution stops after "n" top priority rules are executed. "all" executes all the rules.-->
     <!--dataKey="string" (required) root key from which user data can be accessed. -->
     <!--resultKey="string" key from which result.put function can be accessed. default value is "result".-->
+    <!--workflow: "string" to group rulesets to the same workflow.-->
 
     <ruleset name="personRules" dataKey="MyData" resultKey="result" filterTypes="types.Person,types.Company" 
-        filterStrict="false" prioritiesCount="all" >
+        filterStrict="false" prioritiesCount="all"  workflow="promotioncycle">
 
         <rule name="personFilter1" priority="3">
                 <r>with .MyData</r>
@@ -106,6 +107,17 @@ From `examples/rules.xml`
             <r>end</r>
         </rule>
     </ruleset>
+
+    <ruleset name="personRules2" dataKey="MyData" resultKey="result" filterTypes="types.Person,types.Company" 
+    filterStrict="false" prioritiesCount="all" workflow="demotioncycle">
+    <rule name="personFilter1" priority="1">
+        <r>with .MyData</r>
+            <r>
+                eq .types.Company.Name "Myntra" | .types.Person.SetSalary 30000
+            </r>
+        <r>end</r>
+    </rule>
+    </ruleset>    
 </roulette>
 ```
 
@@ -115,10 +127,34 @@ From `examples/...`
 
 ```go
 ...
-p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
+    p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
+    c := types.Company{Name: "Myntra"}
+    // modify the provided object
+    parser, err := roulette.NewSimpleParser(readFile("../rules.xml"))
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    executor := roulette.NewSimpleExecutor(parser)
+    executor.Execute(&p, &c, []string{"hello"}, false, 4, 1.23)
+
+    if p.Age != 25 {
+        log.Fatal("Expected Age to be 25")
+    }
+
+  ...
+```
+
+`workflows`
+
+```go
+...
+
+	p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
 	c := types.Company{Name: "Myntra"}
-  // modify the provided object
-	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"))
+
+	// set the workflow pattern
+	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"), "demotion*")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -126,18 +162,22 @@ p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
 	executor := roulette.NewSimpleExecutor(parser)
 	executor.Execute(&p, &c, []string{"hello"}, false, 4, 1.23)
 
-  if p.Age != 25 {
-		log.Fatal("Expected Age to be 25")
+	if p.Salary != 30000 {
+		log.Fatal("Expected Salary to be 30000")
 	}
 
-  ...
+	if p.Age != 20 {
+		log.Fatal("Expected Age to be 20")
+	}
+...
 ```
+
 
 `callback`
 
 ```go
 ...
-count := 0
+    count := 0
 	callback := func(vals interface{}) {
 		fmt.Println(vals)
 		count++
@@ -234,6 +274,7 @@ read:
 - `dataKey`: "string" (required) root key from which user data can be accessed.
 
 - `resultKey`: "string" key from which result.put function can be accessed. default value is "result".
+- `workflow`: "string" to group rulesets to the same workflow. The parser can then be created with a wildcard pattern to filter out rilesets.  "*", "?" glob pattern matching is expected.
 
 
 ##### Rule

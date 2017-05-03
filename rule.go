@@ -15,7 +15,7 @@ import (
 // Ruleset ...
 type Ruleset interface {
 	Execute(vals interface{})
-	Compile(left, right, pattern string, defaultfuncs, userfuncs template.FuncMap) error
+	Compile(left, right, workflowPattern string, defaultfuncs, userfuncs template.FuncMap) error
 	Result(result Result)
 	Sort()
 }
@@ -106,11 +106,11 @@ type TextTemplateRuleset struct {
 	ResultKey       string  `xml:"resultKey,attr"`
 	Rules           []*Rule `xml:"rule"`
 	PrioritiesCount string  `xml:"prioritiesCount"`
-	Matcher         string  `xml:"matcher,attr"`
+	Workflow        string  `xml:"workflow,attr"`
 
-	pattern        string
-	result         Result
-	filterTypesArr []string
+	workflowPattern string
+	result          Result
+	filterTypesArr  []string
 }
 
 // sort rules by priority
@@ -282,8 +282,8 @@ func (r *TextTemplateRuleset) getLimit() int {
 }
 
 // Compile ...
-func (r *TextTemplateRuleset) Compile(left, right, pattern string, defaultfuncs, userfuncs template.FuncMap) error {
-	r.pattern = pattern
+func (r *TextTemplateRuleset) Compile(left, right, workflowPattern string, defaultfuncs, userfuncs template.FuncMap) error {
+	r.workflowPattern = workflowPattern
 	if r.FilterTypes == "" {
 		return fmt.Errorf("Missing required attribute filterTypes")
 	}
@@ -344,9 +344,9 @@ func (r *TextTemplateRuleset) Sort() {
 
 // Execute ...
 func (r *TextTemplateRuleset) Execute(vals interface{}) {
-	if len(r.pattern) > 0 && len(r.Matcher) > 0 {
-		if !wildcardMatcher(r.Matcher, r.pattern) {
-			log.Printf("ruleset %s is not valid for the current parser %s %s", r.Name, r.Matcher, r.pattern)
+	if len(r.workflowPattern) > 0 && len(r.Workflow) > 0 {
+		if !wildcardMatcher(r.Workflow, r.workflowPattern) {
+			log.Printf("ruleset %s is not valid for the current parser %s %s", r.Name, r.Workflow, r.workflowPattern)
 			return
 		}
 	}
