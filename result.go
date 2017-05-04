@@ -12,7 +12,7 @@ type ResultCallback struct {
 }
 
 // Put receives a value and put's it on the parser's out channel
-func (q *ResultCallback) Put(val interface{}, prevVal bool) bool {
+func (q ResultCallback) Put(val interface{}, prevVal bool) bool {
 	if !prevVal {
 		return false
 	}
@@ -22,7 +22,7 @@ func (q *ResultCallback) Put(val interface{}, prevVal bool) bool {
 }
 
 // Get the callback function.
-func (q *ResultCallback) Get() interface{} {
+func (q ResultCallback) Get() interface{} {
 	return q.fn
 }
 
@@ -37,7 +37,7 @@ type ResultQueue struct {
 }
 
 // Put receives a value and put's it on the parser's out channel
-func (q *ResultQueue) Put(val interface{}, prevVal bool) bool {
+func (q ResultQueue) Put(val interface{}, prevVal bool) bool {
 	//fmt.Println(val, prevVal)
 	if !prevVal {
 		return false
@@ -52,11 +52,11 @@ func (q *ResultQueue) Put(val interface{}, prevVal bool) bool {
 type empty struct{}
 
 // Get ...
-func (q *ResultQueue) Get() interface{} {
+func (q ResultQueue) Get() interface{} {
 	return q.get
 }
 
-func (q *ResultQueue) block() {
+func (q ResultQueue) block() {
 	// nil channel blocks forever
 	//	blocks := make(chan interface{})
 	for {
@@ -68,8 +68,8 @@ func (q *ResultQueue) block() {
 }
 
 // NewResultQueue returns a new ResultQueue
-func NewResultQueue() *ResultQueue {
-	q := &ResultQueue{get: make(chan interface{})}
+func NewResultQueue() ResultQueue {
+	q := ResultQueue{get: make(chan interface{})}
 	go q.block()
 	return q
 }

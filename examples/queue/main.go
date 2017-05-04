@@ -45,8 +45,12 @@ func main() {
 	in := make(chan interface{})
 	out := make(chan interface{})
 
+	config := roulette.TextTemplateParserConfig{
+		Result: roulette.NewResultQueue(),
+	}
+
 	// get rule results on a queue
-	parser, err := roulette.NewQueueParser(readFile("../rules.xml"), "")
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
 	if err != nil {
 		log.Fatal(err)
 	}

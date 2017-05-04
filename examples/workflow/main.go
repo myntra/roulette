@@ -28,8 +28,11 @@ func main() {
 	p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
 	c := types.Company{Name: "Myntra"}
 
+	config := roulette.TextTemplateParserConfig{
+		WorkflowPattern: "demotion*",
+	}
 	// set the workflow pattern
-	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"), "demotion*")
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
 	if err != nil {
 		log.Fatal(err)
 	}

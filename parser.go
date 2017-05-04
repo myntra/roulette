@@ -3,7 +3,8 @@ package roulette
 import (
 	"encoding/xml"
 	"fmt"
-	"reflect"
+	"sort"
+	"strings"
 	"text/template"
 )
 
@@ -13,127 +14,158 @@ var delimRight = "</r>"
 
 // Parser interface provides methods for the executor to update the tree, execute the values and get result.
 type Parser interface {
-	Update(data []byte) error
 	Execute(vals interface{})
-	Result() Result
+	GetResult() Result
+}
+
+// XMLData contains the parsed roulette xml tree
+type XMLData struct {
+	Name     xml.Name              `xml:"roulette"`
+	Rulesets []TextTemplateRuleset `xml:"ruleset"`
 }
 
 // TextTemplateParser holds the rules from a rule file
 type TextTemplateParser struct {
-	Name     xml.Name               `xml:"roulette"`
-	Rulesets []*TextTemplateRuleset `xml:"ruleset"`
+	xml          XMLData
+	config       TextTemplateParserConfig
+	defaultFuncs template.FuncMap
+}
 
-	DefaultFuncs    template.FuncMap
+// Execute executes the parser's rulesets
+func (p TextTemplateParser) Execute(vals interface{}) {
+	for i := range p.xml.Rulesets {
+		p.xml.Rulesets[i].Execute(vals)
+	}
+}
+
+// GetResult returns the parser's result.
+func (p TextTemplateParser) GetResult() Result {
+	return p.config.Result
+}
+
+// Compile compiles the parser's rulesets
+func (p *TextTemplateParser) compile() error {
+
+	var _ Ruleset = TextTemplateRuleset{}
+
+	for i := range p.xml.Rulesets {
+
+		if p.xml.Rulesets[i].FilterTypes == "" {
+			return fmt.Errorf("Missing required attribute filterTypes")
+		}
+
+		if p.xml.Rulesets[i].DataKey == "" {
+			return fmt.Errorf("Missing required attribute dataKey")
+		}
+
+		// split filter types
+		replacer := strings.NewReplacer(" ", "", "*", " ")
+		typeName := replacer.Replace(p.xml.Rulesets[i].FilterTypes)
+		filterTypesArr := strings.Split(typeName, ",")
+		sort.Strings(filterTypesArr)
+
+		textTemplateRulesetConfig := textTemplateRulesetConfig{
+			workflowPattern: p.config.WorkflowPattern,
+			result:          p.config.Result,
+			filterTypesArr:  filterTypesArr,
+		}
+
+		p.xml.Rulesets[i].config = textTemplateRulesetConfig
+
+		if p.xml.Rulesets[i].ResultKey == "" {
+			p.xml.Rulesets[i].ResultKey = "result"
+		}
+
+		resultAllowed := true
+
+		if p.xml.Rulesets[i].config.result == nil {
+			resultAllowed = false
+		}
+
+		// set rule config
+		for j := range p.xml.Rulesets[i].Rules {
+
+			ruleConfig := ruleConfig{
+				resultAllowed: resultAllowed,
+				resultKey:     p.xml.Rulesets[i].ResultKey,
+				delimLeft:     p.config.DelimLeft,
+				delimRight:    p.config.DelimRight,
+				defaultfuncs:  p.defaultFuncs,
+				userfuncs:     p.config.Userfuncs,
+			}
+
+			p.xml.Rulesets[i].Rules[j].config = ruleConfig
+
+			// set expcted types for a rule
+			for _, typeName := range p.xml.Rulesets[i].config.filterTypesArr {
+				if strings.Contains(p.xml.Rulesets[i].Rules[j].Expr, typeName) {
+					p.xml.Rulesets[i].Rules[j].config.expectTypes = append(p.xml.Rulesets[i].Rules[j].config.expectTypes, typeName)
+				}
+			}
+
+			p.xml.Rulesets[i].Rules[j].config.allfuncs = template.FuncMap{}
+
+			sort.Strings(p.xml.Rulesets[i].Rules[j].config.expectTypes)
+
+			for k, v := range p.xml.Rulesets[i].Rules[j].config.defaultfuncs {
+				p.xml.Rulesets[i].Rules[j].config.allfuncs[k] = v
+			}
+			for k, v := range p.xml.Rulesets[i].Rules[j].config.userfuncs {
+				p.xml.Rulesets[i].Rules[j].config.allfuncs[k] = v
+			}
+
+			// remove all new lines from the expression
+			p.xml.Rulesets[i].Rules[j].Expr = strings.Replace(p.xml.Rulesets[i].Rules[j].Expr, "\n", "", -1)
+
+		}
+
+		sort.Sort(p.xml.Rulesets[i])
+	}
+
+	return nil
+}
+
+// TextTemplateParserConfig sets the optional config for the TextTemplateParser
+type TextTemplateParserConfig struct {
 	Userfuncs       template.FuncMap
 	DelimLeft       string
 	DelimRight      string
 	WorkflowPattern string // filter rulesets based on the pattern
-	RuleResult      Result
-	Get             chan interface{}
-}
-
-// Compile compiles the parser's rulesets
-func (p *TextTemplateParser) Compile() error {
-
-	var _ Ruleset = &TextTemplateRuleset{}
-	for _, ruleset := range p.Rulesets {
-
-		ruleset.Result(p.RuleResult)
-
-		err := ruleset.Compile(p.DelimLeft, p.DelimRight, p.WorkflowPattern, p.DefaultFuncs, p.Userfuncs)
-		if err != nil {
-			return err
-		}
-
-		ruleset.Sort()
-	}
-
-	return nil
-}
-
-// Execute executes the parser's rulesets
-func (p *TextTemplateParser) Execute(vals interface{}) {
-	for _, ruleset := range p.Rulesets {
-		ruleset.Execute(vals)
-	}
-}
-
-// Result returns the parser's result.
-func (p *TextTemplateParser) Result() Result {
-	return p.RuleResult
-}
-
-// AddFuncs allows additional functions to be added to the parser
-// Functions must be of the signature: f(arg1,arg2, prevVal ...string)string
-// See funcmap.go for examples.
-func (p *TextTemplateParser) AddFuncs(funcMap template.FuncMap) error {
-	for name, fn := range funcMap {
-		if !goodName(name) {
-			return fmt.Errorf("function name %s is not a valid identifier", name)
-		}
-		v := reflect.ValueOf(fn)
-		if v.Kind() != reflect.Func {
-			return fmt.Errorf("value for " + name + " not a function")
-		}
-		if !goodFunc(v.Type()) {
-			return fmt.Errorf("can't install method/function %q with %d results", name, v.Type().NumOut())
-		}
-		p.Userfuncs[name] = fn
-	}
-
-	return p.Compile()
-}
-
-// RemoveFuncs removes previously added functions from the parser
-func (p *TextTemplateParser) RemoveFuncs(funcMap template.FuncMap) {
-	for k := range funcMap {
-		delete(p.Userfuncs, k)
-	}
-
-	p.Compile()
-}
-
-// Delims sets the custom delimieters for parsing the text/template expression
-func (p *TextTemplateParser) Delims(left, right string) {
-	p.DelimLeft = left
-	p.DelimRight = right
-	p.Compile()
-}
-
-// Update is a wrapper over new for the current parser
-// The method recompiles the templates.
-func (p *TextTemplateParser) Update(data []byte) error {
-
-	err := xml.Unmarshal(data, p)
-	if err != nil {
-		return err
-	}
-
-	// validate
-	err = p.Compile()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	Result          Result
 }
 
 // NewTextTemplateParser returns a new roulette format xml parser.
-func NewTextTemplateParser(data []byte, result Result, workflowPattern string) (Parser, error) {
+func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser, error) {
 
-	get := make(chan interface{})
-
-	parser := &TextTemplateParser{
-		DelimLeft:       delimLeft,
-		DelimRight:      delimRight,
-		DefaultFuncs:    defaultFuncMap,
-		Userfuncs:       template.FuncMap{},
-		Get:             get,
-		WorkflowPattern: workflowPattern,
-		RuleResult:      result,
+	if config.DelimLeft == "" {
+		config.DelimLeft = delimLeft
+		config.DelimRight = delimRight
 	}
 
-	err := parser.Update(data)
+	if config.Userfuncs == nil {
+		config.Userfuncs = template.FuncMap{}
+	} else {
+		err := validateFuncs(config.Userfuncs)
+		if err != nil {
+			return nil, nil
+		}
+	}
+
+	xmldata := XMLData{}
+
+	err := xml.Unmarshal(data, &xmldata)
+	if err != nil {
+		return nil, err
+	}
+
+	parser := TextTemplateParser{
+		config:       config,
+		defaultFuncs: defaultFuncMap,
+		xml:          xmldata,
+	}
+
+	// compile rulesets
+	err = parser.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -141,17 +173,11 @@ func NewTextTemplateParser(data []byte, result Result, workflowPattern string) (
 	return parser, nil
 }
 
-// NewSimpleParser returns a TextTemplateParser with a nil Result.
-func NewSimpleParser(data []byte, pattern string) (Parser, error) {
-	return NewTextTemplateParser(data, nil, pattern)
-}
-
-// NewCallbackParser returns a TextTemplateParser with a new ResultCallback
-func NewCallbackParser(data []byte, fn func(interface{}), pattern string) (Parser, error) {
-	return NewTextTemplateParser(data, NewResultCallback(fn), pattern)
-}
-
-// NewQueueParser returns a TextTemplateParser with a new ResultQueue.
-func NewQueueParser(data []byte, pattern string) (Parser, error) {
-	return NewTextTemplateParser(data, NewResultQueue(), pattern)
+// NewParser returns a TextTemplateParser with default config
+func NewParser(data []byte, config ...TextTemplateParserConfig) (Parser, error) {
+	cfg := TextTemplateParserConfig{}
+	if len(config) > 0 {
+		cfg = config[0]
+	}
+	return NewTextTemplateParser(data, cfg)
 }

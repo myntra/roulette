@@ -128,20 +128,23 @@ From `examples/...`
 
 ```go
 ...
-    p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
-    c := types.Company{Name: "Myntra"}
-    // modify the provided object
-    parser, err := roulette.NewSimpleParser(readFile("../rules.xml"))
-    if err != nil {
-        log.Fatal(err)
-    }
+   	p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
+	c := types.Company{Name: "Myntra"}
 
-    executor := roulette.NewSimpleExecutor(parser)
-    executor.Execute(&p, &c, []string{"hello"}, false, 4, 1.23)
+	config := roulette.TextTemplateParserConfig{}
 
-    if p.Age != 25 {
-        log.Fatal("Expected Age to be 25")
-    }
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := roulette.NewSimpleExecutor(parser)
+	executor.Execute(&p, &c, []string{"hello"}, false, 4, 1.23)
+
+	if p.Age != 25 {
+		log.Fatal("Expected Age to be 25")
+	}
+
 
   ...
 ```
@@ -154,8 +157,11 @@ From `examples/...`
 	p := types.Person{ID: 1, Age: 20, Experience: 7, Vacations: 5, Position: "SSE"}
 	c := types.Company{Name: "Myntra"}
 
+	config := roulette.TextTemplateParserConfig{
+		WorkflowPattern: "demotion*",
+	}
 	// set the workflow pattern
-	parser, err := roulette.NewSimpleParser(readFile("../rules.xml"), "demotion*")
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -183,8 +189,12 @@ From `examples/...`
 		fmt.Println(vals)
 		count++
 	}
-  // get rule results as callback
-	parser, err := roulette.NewCallbackParser(readFile("../rules.xml",""), callback)
+
+	config := roulette.TextTemplateParserConfig{
+		Result: roulette.NewResultCallback(callback),
+	}
+
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -200,8 +210,15 @@ From `examples/...`
 
 ```go
 ...
-// get rule results on a queue
-	parser, err := roulette.NewQueueParser(readFile("../rules.xml"),"")
+in := make(chan interface{})
+	out := make(chan interface{})
+
+	config := roulette.TextTemplateParserConfig{
+		Result: roulette.NewResultQueue(),
+	}
+
+	// get rule results on a queue
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -209,7 +226,7 @@ From `examples/...`
 	executor := roulette.NewQueueExecutor(parser)
 	executor.Execute(in, out)
 
-  //writer
+	//writer
 	go func(in chan interface{}, values []interface{}) {
 
 		for _, v := range values {
@@ -246,8 +263,6 @@ read:
 			log.Fatalf("received  %d less results", expectedResults)
 		}
 	}
-
-
 ...
 ```
 
@@ -351,12 +366,15 @@ executor.Execute(t1,t2)
 An implementation of the `roulette.SimpleExecute` interface. which accepts a parser initialized with `roulette.ResultCallback`.
 
 ```go
+    config := roulette.TextTemplateParserConfig{}
 
-parser,err := NewTextTemplateParser(data, NewResultCallback(fn)),"")
-// or parser, err := roulette.NewCallbackParser(data,fn,"")
-executor := roulette.NewSimpleExecutor(parser)
-executor.Execute(t1,t2)
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	executor := roulette.NewSimpleExecutor(parser)
+	executor.Execute(...)
 ```
 
 #### QueueExecutor 
@@ -365,15 +383,21 @@ An implementation of the `roulette.QueueExecute` interface. which accepts the `r
 
 ```go
 
-parser,err := NewTextTemplateParser(data, NewResultQueue(),"")
-// or parser, err := roulette.NewQueueParser(data,"")
-executor := roulette.NewQueueExecutor(parser)
-
 in := make(chan interface{})
-out := make(chan interface{})
+		out := make(chan interface{})
 
-executor.Execute(in, out)
+		config := roulette.TextTemplateParserConfig{
+			Result: roulette.NewResultQueue(),
+		}
 
+		// get rule results on a queue
+		parser, err := roulette.NewParser(readFile("../rules.xml"), config)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		executor := roulette.NewQueueExecutor(parser)
+		executor.Execute(in, out)
 ```
 
 For concrete examples of the above please see the `examples` directory. 

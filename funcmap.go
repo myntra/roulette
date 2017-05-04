@@ -2,6 +2,7 @@ package roulette
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"text/template"
 	"unicode"
@@ -310,7 +311,7 @@ func not(arg0 reflect.Value, arg1 ...reflect.Value) bool {
 	return !truth(arg0)
 }
 
-func andOf(arg0 reflect.Value, args ...reflect.Value) (bool, error) {
+func and(arg0 reflect.Value, args ...reflect.Value) (bool, error) {
 
 	if !truth(arg0) {
 		return false, nil
@@ -325,7 +326,7 @@ func andOf(arg0 reflect.Value, args ...reflect.Value) (bool, error) {
 	return true, nil
 }
 
-func orOf(arg0, arg1 reflect.Value, args ...reflect.Value) (bool, error) {
+func or(arg0, arg1 reflect.Value, args ...reflect.Value) (bool, error) {
 
 	for i := range args {
 		prevArg := args[i]
@@ -366,8 +367,24 @@ func within(arg1, arg2, arg3 reflect.Value, arg4 ...reflect.Value) (bool, error)
 	return greaterOrEqual && lessOrEqual, nil
 }
 
-func diff(arg1, arg2 int, prevVal ...bool) int {
-	return arg1 - arg2
+// validateFuncs validates additional functions to be added to the parser
+// Functions must be of the signature: f(arg1,arg2, prevVal ...bool)bool
+// See funcmap.go for examples.
+func validateFuncs(funcMap template.FuncMap) error {
+	for name, fn := range funcMap {
+		if !goodName(name) {
+			return fmt.Errorf("function name %s is not a valid identifier", name)
+		}
+		v := reflect.ValueOf(fn)
+		if v.Kind() != reflect.Func {
+			return fmt.Errorf("value for " + name + " not a function")
+		}
+		if !goodFunc(v.Type()) {
+			return fmt.Errorf("can't install method/function %q with %d results", name, v.Type().NumOut())
+		}
+	}
+
+	return nil
 }
 
 var defaultFuncMap = template.FuncMap{
@@ -380,6 +397,6 @@ var defaultFuncMap = template.FuncMap{
 	"lt":  lt, // <
 	"ne":  ne, // !=
 	"not": not,
-	"and": andOf,
-	"or":  orOf,
+	"and": and,
+	"or":  or,
 }

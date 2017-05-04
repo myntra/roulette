@@ -1,0 +1,41 @@
+<roulette>
+    <ruleset name="ruleset1" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="all" workflow="ruleset1">
+
+        <rule name="setA1" priority="1">
+            <r>with .TestData</r>
+                <r>
+                    .roulette.T2.SetA 5
+                </r>
+            <r>end</r>
+        </rule>
+
+        <rule name="setA2" priority="2">
+            <r>with .TestData</r>
+                <r>
+                    .roulette.T2.SetA 10 
+                </r>
+            <r>end</r>
+        </rule>
+    </ruleset>
+
+    <ruleset name="ruleset2" dataKey="TestData" resultKey="result" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="1" workflow="ruleset2">
+
+        <rule name="setA21" priority="1">
+            <r>with .TestData</r>
+                <r>
+                    .roulette.T2.SetA 5
+                </r>
+            <r>end</r>
+        </rule>
+
+        <rule name="setA22" priority="2">
+            <r>with .TestData</r>
+                <r>
+                    .roulette.T2.SetA 10
+                </r>
+            <r>end</r>
+        </rule>
+    </ruleset>
+</roulette>

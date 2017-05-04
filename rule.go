@@ -15,17 +15,9 @@ import (
 // Ruleset ...
 type Ruleset interface {
 	Execute(vals interface{})
-	Compile(left, right, workflowPattern string, defaultfuncs, userfuncs template.FuncMap) error
-	Result(result Result)
-	Sort()
 }
 
-// Rule is a single rule expression. A rule expression is a valid go text/template
-type Rule struct {
-	Name     string `xml:"name,attr"`
-	Priority int    `xml:"priority,attr"`
-	Expr     string `xml:",innerxml"`
-
+type ruleConfig struct {
 	delimLeft    string
 	delimRight   string
 	defaultfuncs template.FuncMap
@@ -35,50 +27,41 @@ type Rule struct {
 	expectTypes   []string
 	resultAllowed bool
 	resultKey     string
-	templateError error
 }
 
-// compile initialises rule templates
-func (r *Rule) compile() {
-
-	r.allfuncs = template.FuncMap{}
-
-	sort.Strings(r.expectTypes)
-
-	for k, v := range r.defaultfuncs {
-		r.allfuncs[k] = v
-	}
-	for k, v := range r.userfuncs {
-		r.allfuncs[k] = v
-	}
-
-	// remove all new lines from the expression
-	r.Expr = strings.Replace(r.Expr, "\n", "", -1)
-
-	return
+// Rule is a single rule expression. A rule expression is a valid go text/template
+type Rule struct {
+	Name     string `xml:"name,attr"`
+	Priority int    `xml:"priority,attr"`
+	Expr     string `xml:",innerxml"`
+	config   ruleConfig
 }
 
-func (r *Rule) isValid(filterTypesArr []string) error {
+func (r Rule) isValid(filterTypesArr []string) error {
 
-	if strings.Contains(r.Expr, r.resultKey) && !r.resultAllowed {
+	if strings.Contains(r.Expr, r.config.resultKey) && !r.config.resultAllowed {
 		return fmt.Errorf("rule expression contains result func but no type Result interface was set")
 	}
 
-	err := fmt.Errorf("rule expression expected types %s, got %s", r.expectTypes, filterTypesArr)
+	if !strings.Contains(r.Expr, r.config.resultKey) && r.config.resultAllowed {
+		return fmt.Errorf("rule expression does not contains result func but type Result interface was set")
+	}
 
-	if r.expectTypes == nil || filterTypesArr == nil {
+	err := fmt.Errorf("rule expression expected types %s, got %s", r.config.expectTypes, filterTypesArr)
+
+	if r.config.expectTypes == nil || filterTypesArr == nil {
 		return err
 	}
 
 	// less
-	if len(filterTypesArr) < len(r.expectTypes) {
+	if len(filterTypesArr) < len(r.config.expectTypes) {
 		return err
 	}
 
 	// equal to
-	if len(filterTypesArr) == len(r.expectTypes) {
-		for i := range r.expectTypes {
-			if filterTypesArr[i] != r.expectTypes[i] {
+	if len(filterTypesArr) == len(r.config.expectTypes) {
+		for i := range r.config.expectTypes {
+			if filterTypesArr[i] != r.config.expectTypes[i] {
 				return err
 			}
 		}
@@ -86,7 +69,7 @@ func (r *Rule) isValid(filterTypesArr []string) error {
 
 	// greater than
 	// all expected types should be present in the template data.
-	for _, expectedType := range r.expectTypes {
+	for _, expectedType := range r.config.expectTypes {
 		j := sort.SearchStrings(filterTypesArr, expectedType)
 		found := j < len(filterTypesArr) && filterTypesArr[j] == expectedType
 		if !found {
@@ -97,56 +80,59 @@ func (r *Rule) isValid(filterTypesArr []string) error {
 	return nil
 }
 
-// TextTemplateRuleset is a collection of rules for a valid go type
-type TextTemplateRuleset struct {
-	Name            string  `xml:"name,attr"`
-	FilterTypes     string  `xml:"filterTypes,attr"`
-	FilterStrict    bool    `xml:"filterStrict,attr"`
-	DataKey         string  `xml:"dataKey,attr"`
-	ResultKey       string  `xml:"resultKey,attr"`
-	Rules           []*Rule `xml:"rule"`
-	PrioritiesCount string  `xml:"prioritiesCount"`
-	Workflow        string  `xml:"workflow,attr"`
-
+type textTemplateRulesetConfig struct {
 	workflowPattern string
 	result          Result
 	filterTypesArr  []string
 }
 
+// TextTemplateRuleset is a collection of rules for a valid go type
+type TextTemplateRuleset struct {
+	Name            string `xml:"name,attr"`
+	FilterTypes     string `xml:"filterTypes,attr"`
+	FilterStrict    bool   `xml:"filterStrict,attr"`
+	DataKey         string `xml:"dataKey,attr"`
+	ResultKey       string `xml:"resultKey,attr"`
+	Rules           []Rule `xml:"rule"`
+	PrioritiesCount string `xml:"prioritiesCount,attr"`
+	Workflow        string `xml:"workflow,attr"`
+	config          textTemplateRulesetConfig
+}
+
 // sort rules by priority
-func (r *TextTemplateRuleset) Len() int {
-	return len(r.Rules)
+func (t TextTemplateRuleset) Len() int {
+	return len(t.Rules)
 }
-func (r *TextTemplateRuleset) Swap(i, j int) {
-	r.Rules[i], r.Rules[j] = r.Rules[j], r.Rules[i]
+func (t TextTemplateRuleset) Swap(i, j int) {
+	t.Rules[i], t.Rules[j] = t.Rules[j], t.Rules[i]
 }
-func (r *TextTemplateRuleset) Less(i, j int) bool {
-	return r.Rules[i].Priority < r.Rules[j].Priority
+func (t TextTemplateRuleset) Less(i, j int) bool {
+	return t.Rules[i].Priority < t.Rules[j].Priority
 }
 
-func (r *TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
+func (t TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
 
-	if r.filterTypesArr == nil || filterTypesArr == nil {
+	if t.config.filterTypesArr == nil || filterTypesArr == nil {
 		return false
 	}
 
-	if len(r.filterTypesArr) != len(filterTypesArr) && r.FilterStrict {
+	if len(t.config.filterTypesArr) != len(filterTypesArr) && t.FilterStrict {
 		return false
 	}
 
 	// if not filterStrict, look for atleast one match
 	// if filterStrict look for atleast one mismatch
-	for i, v := range r.filterTypesArr {
-		j := sort.SearchStrings(r.filterTypesArr, v)
-		found := j < len(r.filterTypesArr) && r.filterTypesArr[i] == v
+	for i, v := range t.config.filterTypesArr {
+		j := sort.SearchStrings(t.config.filterTypesArr, v)
+		found := j < len(t.config.filterTypesArr) && t.config.filterTypesArr[i] == v
 		if !found {
-			if r.FilterStrict {
+			if t.FilterStrict {
 				return false
 			}
 		} else {
 
 			// filtering is not strict and one atleast one match found.
-			if !r.FilterStrict {
+			if !t.FilterStrict {
 				return true
 			}
 		}
@@ -155,7 +141,7 @@ func (r *TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
 	return false
 }
 
-func (r *TextTemplateRuleset) getTypes(vals interface{}) []string {
+func getTypes(vals interface{}) []string {
 	var types []string
 	switch vals.(type) {
 	case map[string]interface{}:
@@ -181,11 +167,12 @@ func (r *TextTemplateRuleset) getTypes(vals interface{}) []string {
 	return types
 }
 
-func (r *TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interface{} {
+func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interface{} {
 
 	//fmt.Println("getTemplateData", reflect.TypeOf(vals))
 	// flatten multiple types in template map so that they can be referred by
 	// dataKey
+
 	tmplData := make(map[string]interface{})
 	valsData := make(map[string]interface{})
 	// index array of same types
@@ -200,7 +187,7 @@ func (r *TextTemplateRuleset) getTemplateData(vals interface{}) map[string]inter
 		for i, val := range vals.([]interface{}) {
 
 			switch val.(type) {
-			case []string, []int32, []int64, []bool, []float32, []float64, []interface{}:
+			case []string, []int, []int32, []int64, []bool, []float32, []float64, []interface{}:
 				replacer := strings.NewReplacer("[]", "", "{}", "")
 				typeName := replacer.Replace(reflect.TypeOf(val).String())
 				valsData[typeName+"slice"+strconv.Itoa(i)] = val
@@ -258,8 +245,8 @@ func (r *TextTemplateRuleset) getTemplateData(vals interface{}) map[string]inter
 		}
 	}
 
-	valsData[r.ResultKey] = r.result
-	tmplData[r.DataKey] = valsData
+	valsData[t.ResultKey] = t.config.result
+	tmplData[t.DataKey] = valsData
 
 	//fmt.Println("map", tmplData)
 
@@ -267,105 +254,45 @@ func (r *TextTemplateRuleset) getTemplateData(vals interface{}) map[string]inter
 
 }
 
-func (r *TextTemplateRuleset) getLimit() int {
+func (t TextTemplateRuleset) getLimit() int {
 
-	if r.PrioritiesCount == "all" || r.PrioritiesCount == "" {
-		return len(r.Rules)
+	if t.PrioritiesCount == "all" || t.PrioritiesCount == "" {
+		return len(t.Rules)
 	}
 
-	prioritiesCount, err := strconv.ParseInt(r.PrioritiesCount, 10, 32)
+	prioritiesCount, err := strconv.ParseInt(t.PrioritiesCount, 10, 32)
 	if err != nil {
-		return len(r.Rules)
+		return len(t.Rules)
 	}
 
 	return int(prioritiesCount)
 }
 
-// Compile ...
-func (r *TextTemplateRuleset) Compile(left, right, workflowPattern string, defaultfuncs, userfuncs template.FuncMap) error {
-	r.workflowPattern = workflowPattern
-	if r.FilterTypes == "" {
-		return fmt.Errorf("Missing required attribute filterTypes")
-	}
-
-	if r.DataKey == "" {
-		return fmt.Errorf("Missing required attribute dataKey")
-	}
-
-	// replace spaces, commas
-	replacer := strings.NewReplacer(" ", "", "*", " ")
-	typeName := replacer.Replace(r.FilterTypes)
-	r.filterTypesArr = strings.Split(typeName, ",")
-	sort.Strings(r.filterTypesArr)
-	//fmt.Println("filterTypesArr", r.filterTypesArr)
-	// set expected types for a rule
-	for _, rule := range r.Rules {
-		for _, typeName := range r.filterTypesArr {
-			if strings.Contains(rule.Expr, typeName) {
-				rule.expectTypes = append(rule.expectTypes, typeName)
-			}
-		}
-	}
-
-	if r.ResultKey == "" {
-		r.ResultKey = "result"
-	}
-
-	resultAllowed := true
-
-	if r.result == nil {
-		resultAllowed = false
-	}
-
-	for _, rule := range r.Rules {
-
-		rule.resultAllowed = resultAllowed
-		rule.resultKey = r.ResultKey
-		rule.delimLeft = delimLeft
-		rule.delimRight = delimRight
-		rule.defaultfuncs = defaultfuncs
-		rule.userfuncs = userfuncs
-
-		rule.compile()
-	}
-
-	return nil
-}
-
-// Result ...
-func (r *TextTemplateRuleset) Result(result Result) {
-	r.result = result
-}
-
-// Sort ...
-func (r *TextTemplateRuleset) Sort() {
-	sort.Sort(r)
-}
-
 // Execute ...
-func (r *TextTemplateRuleset) Execute(vals interface{}) {
-	if len(r.workflowPattern) > 0 && len(r.Workflow) > 0 {
-		if !wildcardMatcher(r.Workflow, r.workflowPattern) {
-			log.Printf("ruleset %s is not valid for the current parser %s %s", r.Name, r.Workflow, r.workflowPattern)
+func (t TextTemplateRuleset) Execute(vals interface{}) {
+
+	if len(t.config.workflowPattern) > 0 && len(t.Workflow) > 0 {
+		if !wildcardMatcher(t.Workflow, t.config.workflowPattern) {
+			log.Printf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow, t.config.workflowPattern)
 			return
 		}
 	}
 
-	types := r.getTypes(vals)
+	types := getTypes(vals)
 	sort.Strings(types)
-	if !r.isValidForTypes(types...) {
+	if !t.isValidForTypes(types...) {
 		log.Println("invalid types, skpping...", types)
 		return
 	}
 
 	//	fmt.Println("types:", types)
 
-	tmplData := r.getTemplateData(vals)
+	tmplData := t.getTemplateData(vals)
 
 	successCount := 0
-	limit := r.getLimit()
+	limit := t.getLimit()
 
-	for _, rule := range r.Rules {
+	for _, rule := range t.Rules {
 
 		// validate if one of the types exist in the expression.
 		// log.Printf("test rule %s", rule.Name)
@@ -376,7 +303,12 @@ func (r *TextTemplateRuleset) Execute(vals interface{}) {
 			continue
 		}
 
-		t, err := template.New(rule.Name).Delims(rule.delimLeft, rule.delimRight).Funcs(rule.allfuncs).Parse(rule.Expr)
+		t, err := template.
+			New(rule.Name).Delims(
+			rule.config.delimLeft, rule.config.delimRight).
+			Funcs(rule.config.allfuncs).
+			Parse(rule.Expr)
+
 		if err != nil {
 			log.Printf("invalid rule %s, error: %v", rule.Name, err)
 			continue

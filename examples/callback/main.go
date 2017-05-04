@@ -37,7 +37,11 @@ func main() {
 		count++
 	}
 
-	parser, err := roulette.NewCallbackParser(readFile("../rules.xml"), callback, "")
+	config := roulette.TextTemplateParserConfig{
+		Result: roulette.NewResultCallback(callback),
+	}
+
+	parser, err := roulette.NewParser(readFile("../rules.xml"), config)
 	if err != nil {
 		log.Fatal(err)
 	}

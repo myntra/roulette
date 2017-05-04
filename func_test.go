@@ -3,6 +3,7 @@ package roulette
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"testing"
 	"text/template"
 )
@@ -14,7 +15,18 @@ type cmpTest struct {
 }
 
 var cmpTests = []cmpTest{
+	{"in 2 1 3 ", "true", true},
+	{"eq 1 1 | in 2 1 3 ", "true", true},
+	{"and (eq 1 1) (ne 1 2)", "true", true},
+	{"eq 1 1 | and (eq 1 1) (ne 1 2)", "true", true},
+	{"or (eq 1 1) (ne 1 1)", "true", true},
+	{"ne 1 2 | or (eq 1 1) (ne 1 1)", "true", true},
+	{"or (eq 2 1) (ne 1 2)", "true", true},
+	{"or (eq 2 1) (ne 1 1)", "false", true},
+	{"not false", "true", true},
+	{"eq 1 1 | not false", "true", true},
 	{"eq true true", "true", true},
+	{"ne 1 2 | eq true true", "true", true},
 	{"eq true false", "false", true},
 	{"eq 1+2i 1+2i", "true", true},
 	{"eq 1+2i 1+3i", "false", true},
@@ -29,6 +41,7 @@ var cmpTests = []cmpTest{
 	{"eq 3 4 5 6 3", "true", true},
 	{"eq 3 4 5 6 7", "false", true},
 	{"ne true true", "false", true},
+	{"eq 1 1 | ne true true", "false", true},
 	{"ne true false", "true", true},
 	{"ne 1+2i 1+2i", "false", true},
 	{"ne 1+2i 1+3i", "true", true},
@@ -41,6 +54,7 @@ var cmpTests = []cmpTest{
 	{"ne .Uthree .Uthree", "false", true},
 	{"ne .Uthree .Ufour", "true", true},
 	{"lt 1.5 1.5", "false", true},
+	{"eq 1 1 | lt 1.5 1.5", "false", true},
 	{"lt 1.5 2.5", "true", true},
 	{"lt 1 1", "false", true},
 	{"lt 1 2", "true", true},
@@ -49,6 +63,7 @@ var cmpTests = []cmpTest{
 	{"lt .Uthree .Uthree", "false", true},
 	{"lt .Uthree .Ufour", "true", true},
 	{"le 1.5 1.5", "true", true},
+	{"eq 1 1 | le 1.5 1.5", "true", true},
 	{"le 1.5 2.5", "true", true},
 	{"le 2.5 1.5", "false", true},
 	{"le 1 1", "true", true},
@@ -61,6 +76,7 @@ var cmpTests = []cmpTest{
 	{"le .Uthree .Ufour", "true", true},
 	{"le .Ufour .Uthree", "false", true},
 	{"gt 1.5 1.5", "false", true},
+	{"eq 1 1 | gt 1.5 1.5", "false", true},
 	{"gt 1.5 2.5", "false", true},
 	{"gt 1 1", "false", true},
 	{"gt 2 1", "true", true},
@@ -71,6 +87,7 @@ var cmpTests = []cmpTest{
 	{"gt .Uthree .Ufour", "false", true},
 	{"gt .Ufour .Uthree", "true", true},
 	{"ge 1.5 1.5", "true", true},
+	{"eq 1 1 | ge 1.5 1.5", "true", true},
 	{"ge 1.5 2.5", "false", true},
 	{"ge 2.5 1.5", "true", true},
 	{"ge 1 1", "true", true},
@@ -125,7 +142,7 @@ func TestComparison(t *testing.T) {
 	}{3, 4, -1, 3}
 	for _, test := range cmpTests {
 		text := fmt.Sprintf("{{if %s}}true{{else}}false{{end}}", test.expr)
-		tmpl, err := template.New("empty").Parse(text)
+		tmpl, err := template.New("empty").Funcs(defaultFuncMap).Parse(text)
 		if err != nil {
 			t.Fatalf("%q: %s", test.expr, err)
 		}
@@ -143,4 +160,80 @@ func TestComparison(t *testing.T) {
 			t.Errorf("%s: want %s; got %s", test.expr, test.truth, b.String())
 		}
 	}
+}
+
+func TestValidateFuncs(t *testing.T) {
+
+	testFuncMap1 := template.FuncMap{
+		"test1": func(a, b int, prev ...bool) bool {
+			return true
+		},
+	}
+
+	err := validateFuncs(testFuncMap1)
+	if err != nil {
+		log.Fatal("testFuncMap1 must be valid")
+	}
+
+	testFuncMap2 := template.FuncMap{
+		"test2": func(a, b int, prev ...bool) (bool, error) {
+			return false, nil
+		},
+	}
+
+	err = validateFuncs(testFuncMap2)
+	if err != nil {
+		log.Fatal("testFuncMap2 must be valid")
+	}
+
+	testFuncMap3 := template.FuncMap{
+		"test3": func(a, b int, prev ...bool) (bool, int) {
+			return false, 0
+		},
+	}
+
+	err = validateFuncs(testFuncMap3)
+	if err == nil {
+		log.Fatal("testFuncMap3 must be invalid")
+	}
+
+	var _f = func(a, b int, prev ...bool) (bool, error) {
+		return false, nil
+	}
+	testFuncMap4 := template.FuncMap{
+		"_%f": _f,
+	}
+
+	err = validateFuncs(testFuncMap4)
+	if err == nil {
+		log.Fatal("testFuncMap4 must be invalid")
+	}
+
+	testFuncMap4 = template.FuncMap{
+		"_f%f": _f,
+	}
+
+	err = validateFuncs(testFuncMap4)
+	if err == nil {
+		log.Fatal("testFuncMap4 must be invalid")
+	}
+
+	testFuncMap4 = template.FuncMap{
+		"": _f,
+	}
+
+	err = validateFuncs(testFuncMap4)
+	if err == nil {
+		log.Fatal("testFuncMap4 must be invalid")
+	}
+
+	testFuncMap4 = template.FuncMap{
+		"": err,
+	}
+
+	err = validateFuncs(testFuncMap4)
+	if err == nil {
+		log.Fatal("testFuncMap4 must be invalid")
+	}
+
 }

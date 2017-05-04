@@ -4,13 +4,11 @@ import "fmt"
 
 // SimpleExecute interface provides methods to retrieve a parser and a method which executes on the incoming values.
 type SimpleExecute interface {
-	RuleParser() Parser
-	Execute(vals ...interface{}) error
+	Execute(vals ...interface{})
 }
 
 // QueueExecute interface provides methods to retrieve a parser and a method which executes on the incoming values on the input channel.
 type QueueExecute interface {
-	RuleParser() Parser
 	Execute(in <-chan interface{}, out chan<- interface{}) // in channel to write, out channel to read.
 }
 
@@ -19,26 +17,15 @@ type SimpleExecutor struct {
 	Parser Parser
 }
 
-// RuleParser ...
-func (s *SimpleExecutor) RuleParser() Parser {
-	return s.Parser
-}
-
 // Execute executes rules in order of priority.
 // one(true): executes in order of priority until a high priority rule is successful, after which execution stops
-func (s *SimpleExecutor) Execute(vals ...interface{}) error {
+func (s *SimpleExecutor) Execute(vals ...interface{}) {
 	s.Parser.Execute(vals)
-	return nil
 }
 
 // QueueExecutor implements the QueueExecute
 type QueueExecutor struct {
 	Parser Parser
-}
-
-// RuleParser ...
-func (q *QueueExecutor) RuleParser() Parser {
-	return q.Parser
 }
 
 // Execute ...
@@ -87,7 +74,7 @@ recv:
 		// Ensure that pending always has values so the select can
 		// multiplex between the receiver and sender properly
 		if len(pending) == 0 {
-			v, ok := <-q.Parser.Result().Get().(chan interface{})
+			v, ok := <-q.Parser.GetResult().Get().(chan interface{})
 			if !ok {
 				// in is closed, flush values
 				fmt.Println("result.get is closed")
@@ -105,7 +92,7 @@ recv:
 
 		select {
 		// Queue incoming values
-		case v, ok := <-q.Parser.Result().Get().(chan interface{}):
+		case v, ok := <-q.Parser.GetResult().Get().(chan interface{}):
 			if !ok {
 				// in is closed, flush values
 				break recv
