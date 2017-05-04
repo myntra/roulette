@@ -1,16 +1,11 @@
 package roulette
 
 import (
-	"encoding/json"
-	"fmt"
 	"reflect"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"text/template"
-
-	"github.com/myntra/roulette/log"
 )
 
 // Ruleset ...
@@ -25,9 +20,12 @@ type ruleConfig struct {
 	userfuncs    template.FuncMap
 	allfuncs     template.FuncMap
 
-	expectTypes   []string
-	resultAllowed bool
-	resultKey     string
+	expectTypes    []string
+	expectTypesErr error
+	noResultFunc   bool
+
+	template    *template.Template
+	templateErr error
 }
 
 // Rule is a single rule expression. A rule expression is a valid go text/template
@@ -40,14 +38,8 @@ type Rule struct {
 
 func (r Rule) isValid(filterTypesArr []string) error {
 
-	if strings.Contains(r.Expr, r.config.resultKey) && !r.config.resultAllowed {
-		return fmt.Errorf("rule expression contains result func but no type Result interface was set")
-	}
-
-	err := fmt.Errorf("rule expression expected types %s, got %s", r.config.expectTypes, filterTypesArr)
-
 	if r.config.expectTypes == nil || filterTypesArr == nil {
-		return err
+		return r.config.expectTypesErr
 	}
 
 	if len(filterTypesArr) == 1 && filterTypesArr[0] == "map[string]interface {}" {
@@ -56,14 +48,14 @@ func (r Rule) isValid(filterTypesArr []string) error {
 
 	// less
 	if len(filterTypesArr) < len(r.config.expectTypes) {
-		return err
+		return r.config.expectTypesErr
 	}
 
 	// equal to
 	if len(filterTypesArr) == len(r.config.expectTypes) {
 		for i := range r.config.expectTypes {
 			if filterTypesArr[i] != r.config.expectTypes[i] {
-				return err
+				return r.config.expectTypesErr
 			}
 		}
 	}
@@ -74,7 +66,7 @@ func (r Rule) isValid(filterTypesArr []string) error {
 		j := sort.SearchStrings(filterTypesArr, expectedType)
 		found := j < len(filterTypesArr) && filterTypesArr[j] == expectedType
 		if !found {
-			return err
+			return r.config.expectTypesErr
 		}
 	}
 
@@ -82,11 +74,9 @@ func (r Rule) isValid(filterTypesArr []string) error {
 }
 
 type textTemplateRulesetConfig struct {
-	workflowPattern string
-	result          Result
-	filterTypesArr  []string
-	regex           *regexp.Regexp
-	isWildCard      bool
+	result         Result
+	filterTypesArr []string
+	workflowMatch  bool
 }
 
 // TextTemplateRuleset is a collection of rules for a valid go type
@@ -100,7 +90,9 @@ type TextTemplateRuleset struct {
 	PrioritiesCount string `xml:"prioritiesCount,attr"`
 	Workflow        string `xml:"workflow,attr"`
 	config          textTemplateRulesetConfig
-	buf             *bufferPool
+	bytesBuf        *bytesPool
+	mapBuf          *mapPool
+	limit           int
 }
 
 // sort rules by priority
@@ -145,52 +137,66 @@ func (t TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
 	return false
 }
 
-func getTypes(vals interface{}) []string {
+func (t TextTemplateRuleset) getTypes(vals interface{}) []string {
 	var types []string
 	switch vals.(type) {
 	case []interface{}:
-		for _, v := range vals.([]interface{}) {
-			typeName := strings.Replace(reflect.TypeOf(v).String(), "*", "", -1)
-			types = append(types, typeName)
+		var typeName string
+		size := len(vals.([]interface{}))
+		types = make([]string, size)
+		for i, v := range vals.([]interface{}) {
+			if reflect.ValueOf(v).Kind() == reflect.Ptr || reflect.ValueOf(v).Kind() == reflect.Interface {
+				typeName = reflect.TypeOf(v).Elem().String()
+			} else {
+				typeName = reflect.TypeOf(v).String()
+			}
+
+			types[i] = typeName
 		}
 
 		break
 
 	default:
-		typeName := strings.Replace(reflect.TypeOf(vals).String(), "*", "", -1)
-		types = append(types, typeName)
+		types = make([]string, 1)
+		typeName := reflect.TypeOf(vals).Elem().String()
+		types[0] = typeName
 	}
 
 	return types
 }
 
-func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interface{} {
+func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, vals interface{}) {
 
 	//fmt.Println("getTemplateData", reflect.TypeOf(vals))
 	// flatten multiple types in template map so that they can be referred by
 	// dataKey
 
-	tmplData := make(map[string]interface{})
-	valsData := make(map[string]interface{})
+	valsData := t.mapBuf.get()
+	defer t.mapBuf.put(valsData)
 	// index array of same types
 	typeArrayIndex := make(map[string]int)
+	var pkgPaths []string
 
 	switch vals.(type) {
 	case []interface{}:
-		nestedMap := make(map[string]interface{})
+		nestedMap := t.mapBuf.get()
+		defer t.mapBuf.put(nestedMap)
+
 		for i, val := range vals.([]interface{}) {
 
 			switch val.(type) {
 			case []string, []int, []int32, []int64, []bool, []float32, []float64, []interface{}:
-				replacer := strings.NewReplacer("[]", "", "{}", "")
-				typeName := replacer.Replace(reflect.TypeOf(val).String())
+				typ := reflect.TypeOf(val).String()
+				typeName := strings.Trim(typ, "[]")
+				typeName = strings.Trim(typ, "{}")
 				valsData[typeName+"slice"+strconv.Itoa(i)] = val
 
 				break
 
 			case map[string]int, map[string]string, map[string]bool:
-				replacer := strings.NewReplacer("[", "", "]", "", "{}", "")
-				typeName := replacer.Replace(reflect.TypeOf(val).String())
+				typ := reflect.TypeOf(val).String()
+				typeName := strings.Trim(typ, "[")
+				typeName = strings.Trim(typ, "]")
 				valsData[typeName+strconv.Itoa(i)] = val
 				break
 			case map[string]interface{}:
@@ -203,11 +209,21 @@ func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interf
 				break
 
 			default:
-				typeName := strings.Replace(reflect.TypeOf(val).String(), "*", "", -1)
-				pkgPaths := strings.Split(typeName, ".")
-				//fmt.Println("getTemplateData: case []interface{}: ", i, pkgPaths)
+				var typeName string
+				if reflect.ValueOf(val).Kind() == reflect.Ptr || reflect.ValueOf(val).Kind() == reflect.Interface {
+					typeName = reflect.TypeOf(val).Elem().String()
+				} else {
+					typeName = reflect.TypeOf(val).String()
+				}
 
-				pkgTypeName := pkgPaths[len(pkgPaths)-1]
+				var pkgTypeName string
+				if reflect.TypeOf(val).PkgPath() != "" {
+					pkgTypeName = reflect.TypeOf(val).PkgPath()
+				} else {
+					pkgPaths = strings.Split(typeName, ".")
+					pkgTypeName = pkgPaths[len(pkgPaths)-1]
+				}
+
 				indexPkgTypeName := pkgTypeName
 
 				_, ok := typeArrayIndex[pkgTypeName]
@@ -234,8 +250,8 @@ func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interf
 
 		break
 	default:
-		typeName := strings.Replace(reflect.TypeOf(vals).String(), "*", "", -1)
-		pkgPaths := strings.Split(typeName, ".")
+		typeName := reflect.TypeOf(vals).Elem().String()
+		pkgPaths = strings.Split(typeName, ".")
 		//fmt.Println("default", pkgPaths)
 		valsData[pkgPaths[0]] = map[string]interface{}{
 			pkgPaths[1]: vals,
@@ -247,99 +263,76 @@ func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interf
 
 	//fmt.Println("map", tmplData)
 
-	return tmplData
-
-}
-
-func (t TextTemplateRuleset) getLimit() int {
-
-	if t.PrioritiesCount == "all" || t.PrioritiesCount == "" {
-		return len(t.Rules)
-	}
-
-	prioritiesCount, err := strconv.ParseInt(t.PrioritiesCount, 10, 32)
-	if err != nil {
-		return len(t.Rules)
-	}
-
-	return int(prioritiesCount)
 }
 
 // Execute ...
 func (t TextTemplateRuleset) Execute(vals interface{}) {
 
-	if len(t.config.workflowPattern) > 0 && len(t.Workflow) > 0 {
-		// if a regex is a no match
-		if !t.config.regex.MatchString(t.config.workflowPattern) && !t.config.isWildCard {
-			log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow, t.config.workflowPattern)
-			return
-		}
-
-		// lets check wildcard
-		if !wildcardMatcher(t.Workflow, t.config.workflowPattern) {
-			log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow, t.config.workflowPattern)
-			return
-		}
-	}
-
-	types := getTypes(vals)
-	sort.Strings(types)
-	if !t.isValidForTypes(types...) {
-		log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
+	if !t.config.workflowMatch {
+		//log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow)
 		return
 	}
 
-	//	fmt.Println("types:", types)
+	types := t.getTypes(vals)
+	sort.Strings(types)
+	if !t.isValidForTypes(types...) {
+		//	log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
+		return
+	}
 
-	tmplData := t.getTemplateData(vals)
+	types = types[:0]
+
+	//	fmt.Println("types:", types)
+	tmplData := t.mapBuf.get()
+	defer t.mapBuf.put(tmplData)
+	t.getTemplateData(tmplData, vals)
 
 	successCount := 0
-	limit := t.getLimit()
 
 	for _, rule := range t.Rules {
 
-		// validate if one of the types exist in the expression.
-		// log.Printf("test rule %s", rule.Name)
+		if rule.config.noResultFunc {
+			//log.Warnf("rule expression contains result func but no type Result interface was set %s", rule.Name)
+			continue
+		}
 
+		// validate if one of the types exist in the expression.
 		err := rule.isValid(types)
 		if err != nil {
-			log.Warnf("invalid rule %s, error: %v", rule.Name, err)
+			//	log.Warnf("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
 
-		tmpl, err := template.
-			New(rule.Name).Delims(
-			rule.config.delimLeft, rule.config.delimRight).
-			Funcs(rule.config.allfuncs).
-			Parse(rule.Expr)
+		if rule.config.templateErr != nil {
+			//	log.Warnf("invalid rule %s, error: %v", rule.Name, rule.config.templateErr)
+			continue
+		}
 
+		buf := t.bytesBuf.get()
+		defer t.bytesBuf.put(buf)
+
+		err = rule.config.template.Execute(buf, tmplData)
 		if err != nil {
-			log.Warnf("invalid rule %s, error: %v", rule.Name, err)
+			//	log.Warnf("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
 
-		buf := t.buf.get()
-		defer t.buf.put(buf)
-
-		err = tmpl.Execute(buf, tmplData)
-		if err != nil {
-			log.Warnf("invalid rule %s, error: %v", rule.Name, err)
-			continue
-		}
-
-		log.Infof("matched rule %s", rule.Name)
+		//log.Infof("matched rule %s", rule.Name)
 
 		var result bool
-		err = json.Unmarshal(buf.Bytes(), &result)
+
+		res := strings.TrimSpace(buf.String())
+
+		result, err = strconv.ParseBool(res)
 		if err != nil {
-			log.Error("marhsal result error", err, buf.String(), tmplData)
+			//log.Warnf("parse result error", err)
 			continue
 		}
 
 		// n high priority rules successful, break
 		if result {
 			successCount++
-			if successCount == limit {
+			if successCount == t.limit {
 				break
 			}
 		}

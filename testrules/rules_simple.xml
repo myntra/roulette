@@ -47,7 +47,7 @@
     <ruleset name="lessFilterTypeSet" dataKey="TestData" resultKey="result" filterTypes="roulette.T1,roulette.T2" 
         filterStrict="false" prioritiesCount="all" >
 
-         <rule name="nilResult" priority="1">
+         <rule name="lessFilterRule" priority="1">
                 <r>with .TestData</r>
                     <r>
                         .roulette.T1.SetA 5 | .roulette.T2.SetA 10

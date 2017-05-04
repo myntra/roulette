@@ -79,6 +79,9 @@ func Warn(args ...interface{}) {
 
 // Warnf ...
 func Warnf(f string, args ...interface{}) {
+	if true {
+		return
+	}
 	logger.Warningf(f, args...)
 }
 

@@ -16,6 +16,7 @@ type SimpleParseTestCase interface {
 	Expected() bool
 	Name() string
 	Desc() string
+	SetLogLevel(string)
 }
 
 func readFile(path string) []byte {
@@ -38,6 +39,7 @@ type T struct {
 	ExpectFunc  func(val interface{}) bool
 	TestName    string
 	Description string
+	Loglevel    string
 }
 
 //SetA ...
@@ -73,12 +75,18 @@ func (t *T1) Execute() {
 	t.Executor.Execute(t)
 }
 
+func (t *T1) SetLogLevel(level string) {
+	t.Loglevel = level
+}
+
 // Parse ...
 func (t *T1) Parse() {
 
 	var err error
 
-	config := TextTemplateParserConfig{}
+	config := TextTemplateParserConfig{
+		LogLevel: t.Loglevel,
+	}
 	if t.Callback != nil {
 		config.Result = NewResultCallback(t.Callback)
 	}
@@ -121,14 +129,19 @@ var simpleParseTestCases = []SimpleParseTestCase{
 	},
 }
 
-func TestSimpleParser(tt *testing.T) {
+func testSimpleParser(loglevel string) {
 	for _, testcase := range simpleParseTestCases {
+		testcase.SetLogLevel(loglevel)
 		testcase.Parse()
 		testcase.Execute()
 		if !testcase.Expected() {
 			log.Fatal(testcase.Name(), testcase.Desc())
 		}
 	}
+}
+
+func TestSimpleParser(tt *testing.T) {
+	testSimpleParser("info")
 }
 
 type T2 struct {
@@ -525,4 +538,23 @@ func TestNoValues(t *testing.T) {
 	executor := NewSimpleExecutor(parser)
 	executor.Execute()
 
+}
+
+func BenchmarkSimpleParser(b *testing.B) {
+	config := TextTemplateParserConfig{
+		LogLevel: "fatal",
+	}
+	parser, err := NewParser(readFile("testrules/rules_simple.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//t1 := &T1{T: &T{A: 1, B: 2}}
+	t2 := &T2{A: 1, B: 2}
+	executor := NewSimpleExecutor(parser)
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		executor.Execute(t2)
+	}
 }

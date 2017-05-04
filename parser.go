@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode"
@@ -33,7 +34,8 @@ type TextTemplateParser struct {
 	xml          XMLData
 	config       TextTemplateParserConfig
 	defaultFuncs template.FuncMap
-	buf          *bufferPool
+	bytesBuf     *bytesPool
+	mapBuf       *mapPool
 }
 
 // Execute executes the parser's rulesets
@@ -50,7 +52,8 @@ func (p TextTemplateParser) GetResult() Result {
 
 // Compile compiles the parser's rulesets
 func (p *TextTemplateParser) compile() error {
-
+	replacer := strings.NewReplacer(" ", "", "*", " ")
+	newLineReplacer := strings.NewReplacer("\n", "")
 	var _ Ruleset = TextTemplateRuleset{}
 
 	for i := range p.xml.Rulesets {
@@ -74,20 +77,49 @@ func (p *TextTemplateParser) compile() error {
 		}
 
 		// assign buffer pool
-		p.xml.Rulesets[i].buf = p.buf
+		p.xml.Rulesets[i].bytesBuf = p.bytesBuf
+		p.xml.Rulesets[i].mapBuf = p.mapBuf
+
+		// limit
+		if p.xml.Rulesets[i].PrioritiesCount == "all" || p.xml.Rulesets[i].PrioritiesCount == "" {
+			p.xml.Rulesets[i].limit = len(p.xml.Rulesets[i].Rules)
+		} else {
+			prioritiesCount, err := strconv.ParseInt(p.xml.Rulesets[i].PrioritiesCount, 10, 32)
+			if err != nil {
+				p.xml.Rulesets[i].limit = len(p.xml.Rulesets[i].Rules)
+			} else {
+				p.xml.Rulesets[i].limit = int(prioritiesCount)
+			}
+		}
 
 		// split filter types
-		replacer := strings.NewReplacer(" ", "", "*", " ")
+
 		typeName := replacer.Replace(p.xml.Rulesets[i].FilterTypes)
 		filterTypesArr := strings.Split(typeName, ",")
 		sort.Strings(filterTypesArr)
 
+		regex := regexp.MustCompile(p.xml.Rulesets[i].Workflow)
+		workflowMatch := true
+
+		if len(p.config.WorkflowPattern) > 0 && len(p.xml.Rulesets[i].Workflow) > 0 {
+			if p.config.IsWildcardWorkflowPattern {
+				if !wildcardMatcher(p.xml.Rulesets[i].Workflow, p.config.WorkflowPattern) {
+					workflowMatch = false
+				}
+
+			} else {
+				// if a regex is a no match
+				if !regex.MatchString(p.config.WorkflowPattern) {
+					workflowMatch = false
+				}
+			}
+
+		}
+
 		textTemplateRulesetConfig := textTemplateRulesetConfig{
-			workflowPattern: p.config.WorkflowPattern,
-			result:          p.config.Result,
-			filterTypesArr:  filterTypesArr,
-			regex:           regexp.MustCompile(p.xml.Rulesets[i].Workflow),
-			isWildCard:      p.config.IsWildcardWorkflowPattern,
+			result:         p.config.Result,
+			filterTypesArr: filterTypesArr,
+			workflowMatch:  workflowMatch,
 		}
 
 		p.xml.Rulesets[i].config = textTemplateRulesetConfig
@@ -106,15 +138,20 @@ func (p *TextTemplateParser) compile() error {
 		for j := range p.xml.Rulesets[i].Rules {
 
 			ruleConfig := ruleConfig{
-				resultAllowed: resultAllowed,
-				resultKey:     p.xml.Rulesets[i].ResultKey,
-				delimLeft:     p.config.DelimLeft,
-				delimRight:    p.config.DelimRight,
-				defaultfuncs:  p.defaultFuncs,
-				userfuncs:     p.config.Userfuncs,
+				delimLeft:    p.config.DelimLeft,
+				delimRight:   p.config.DelimRight,
+				defaultfuncs: p.defaultFuncs,
+				userfuncs:    p.config.Userfuncs,
 			}
 
 			p.xml.Rulesets[i].Rules[j].config = ruleConfig
+
+			// remove all new lines from the expression
+			p.xml.Rulesets[i].Rules[j].Expr = newLineReplacer.Replace(p.xml.Rulesets[i].Rules[j].Expr)
+
+			if strings.Contains(p.xml.Rulesets[i].Rules[j].Expr, p.xml.Rulesets[i].ResultKey) && !resultAllowed {
+				p.xml.Rulesets[i].Rules[j].config.noResultFunc = true
+			}
 
 			// set expcted types for a rule
 			for _, typeName := range p.xml.Rulesets[i].config.filterTypesArr {
@@ -122,6 +159,9 @@ func (p *TextTemplateParser) compile() error {
 					p.xml.Rulesets[i].Rules[j].config.expectTypes = append(p.xml.Rulesets[i].Rules[j].config.expectTypes, typeName)
 				}
 			}
+
+			p.xml.Rulesets[i].Rules[j].config.expectTypesErr = fmt.Errorf("rule expression expected types %s",
+				p.xml.Rulesets[i].Rules[j].config.expectTypes)
 
 			p.xml.Rulesets[i].Rules[j].config.allfuncs = template.FuncMap{}
 
@@ -134,8 +174,14 @@ func (p *TextTemplateParser) compile() error {
 				p.xml.Rulesets[i].Rules[j].config.allfuncs[k] = v
 			}
 
-			// remove all new lines from the expression
-			p.xml.Rulesets[i].Rules[j].Expr = strings.Replace(p.xml.Rulesets[i].Rules[j].Expr, "\n", "", -1)
+			tmpl, err := template.
+				New(p.xml.Rulesets[i].Rules[j].Name).Delims(
+				p.xml.Rulesets[i].Rules[j].config.delimLeft, p.xml.Rulesets[i].Rules[j].config.delimRight).
+				Funcs(p.xml.Rulesets[i].Rules[j].config.allfuncs).
+				Parse(p.xml.Rulesets[i].Rules[j].Expr)
+
+			p.xml.Rulesets[i].Rules[j].config.template = tmpl
+			p.xml.Rulesets[i].Rules[j].config.templateErr = err
 
 		}
 
@@ -193,7 +239,8 @@ func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser
 		config:       config,
 		defaultFuncs: defaultFuncMap,
 		xml:          xmldata,
-		buf:          newBufferPool(),
+		bytesBuf:     newBytesPool(),
+		mapBuf:       newMapPool(),
 	}
 
 	// compile rulesets
