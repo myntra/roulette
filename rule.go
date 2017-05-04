@@ -1,15 +1,16 @@
 package roulette
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/myntra/roulette/log"
 )
 
 // Ruleset ...
@@ -84,6 +85,8 @@ type textTemplateRulesetConfig struct {
 	workflowPattern string
 	result          Result
 	filterTypesArr  []string
+	regex           *regexp.Regexp
+	isWildCard      bool
 }
 
 // TextTemplateRuleset is a collection of rules for a valid go type
@@ -97,6 +100,7 @@ type TextTemplateRuleset struct {
 	PrioritiesCount string `xml:"prioritiesCount,attr"`
 	Workflow        string `xml:"workflow,attr"`
 	config          textTemplateRulesetConfig
+	buf             *bufferPool
 }
 
 // sort rules by priority
@@ -265,8 +269,15 @@ func (t TextTemplateRuleset) getLimit() int {
 func (t TextTemplateRuleset) Execute(vals interface{}) {
 
 	if len(t.config.workflowPattern) > 0 && len(t.Workflow) > 0 {
+		// if a regex is a no match
+		if !t.config.regex.MatchString(t.config.workflowPattern) && !t.config.isWildCard {
+			log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow, t.config.workflowPattern)
+			return
+		}
+
+		// lets check wildcard
 		if !wildcardMatcher(t.Workflow, t.config.workflowPattern) {
-			log.Printf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow, t.config.workflowPattern)
+			log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow, t.config.workflowPattern)
 			return
 		}
 	}
@@ -274,7 +285,7 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 	types := getTypes(vals)
 	sort.Strings(types)
 	if !t.isValidForTypes(types...) {
-		log.Printf("invalid types %s skipping ruleset %s", types, t.Name)
+		log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
 		return
 	}
 
@@ -292,34 +303,36 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 
 		err := rule.isValid(types)
 		if err != nil {
-			log.Printf("invalid rule %s, error: %v", rule.Name, err)
+			log.Warnf("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
 
-		t, err := template.
+		tmpl, err := template.
 			New(rule.Name).Delims(
 			rule.config.delimLeft, rule.config.delimRight).
 			Funcs(rule.config.allfuncs).
 			Parse(rule.Expr)
 
 		if err != nil {
-			log.Printf("invalid rule %s, error: %v", rule.Name, err)
+			log.Warnf("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
 
-		var buf bytes.Buffer
-		err = t.Execute(&buf, tmplData)
+		buf := t.buf.get()
+		defer t.buf.put(buf)
+
+		err = tmpl.Execute(buf, tmplData)
 		if err != nil {
-			log.Printf("invalid rule %s, error: %v", rule.Name, err)
+			log.Warnf("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
 
-		log.Printf("matched rule %s", rule.Name)
+		log.Infof("matched rule %s", rule.Name)
 
 		var result bool
 		err = json.Unmarshal(buf.Bytes(), &result)
 		if err != nil {
-			log.Println("marhsal result error", err, buf.String(), tmplData)
+			log.Error("marhsal result error", err, buf.String(), tmplData)
 			continue
 		}
 

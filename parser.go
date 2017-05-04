@@ -3,10 +3,13 @@ package roulette
 import (
 	"encoding/xml"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"text/template"
 	"unicode"
+
+	"github.com/myntra/roulette/log"
 )
 
 // default delimeters
@@ -30,6 +33,7 @@ type TextTemplateParser struct {
 	xml          XMLData
 	config       TextTemplateParserConfig
 	defaultFuncs template.FuncMap
+	buf          *bufferPool
 }
 
 // Execute executes the parser's rulesets
@@ -69,6 +73,9 @@ func (p *TextTemplateParser) compile() error {
 			}
 		}
 
+		// assign buffer pool
+		p.xml.Rulesets[i].buf = p.buf
+
 		// split filter types
 		replacer := strings.NewReplacer(" ", "", "*", " ")
 		typeName := replacer.Replace(p.xml.Rulesets[i].FilterTypes)
@@ -79,6 +86,8 @@ func (p *TextTemplateParser) compile() error {
 			workflowPattern: p.config.WorkflowPattern,
 			result:          p.config.Result,
 			filterTypesArr:  filterTypesArr,
+			regex:           regexp.MustCompile(p.xml.Rulesets[i].Workflow),
+			isWildCard:      p.config.IsWildcardWorkflowPattern,
 		}
 
 		p.xml.Rulesets[i].config = textTemplateRulesetConfig
@@ -138,11 +147,14 @@ func (p *TextTemplateParser) compile() error {
 
 // TextTemplateParserConfig sets the optional config for the TextTemplateParser
 type TextTemplateParserConfig struct {
-	Userfuncs       template.FuncMap
-	DelimLeft       string
-	DelimRight      string
-	WorkflowPattern string // filter rulesets based on the pattern
-	Result          Result
+	Userfuncs                 template.FuncMap
+	DelimLeft                 string
+	DelimRight                string
+	WorkflowPattern           string // filter rulesets based on the pattern
+	Result                    Result
+	IsWildcardWorkflowPattern bool
+	LogLevel                  string //info, debug, warn, error, fatal. default is info
+	LogPath                   string //stdout, /path/to/file . default is stdout
 }
 
 // NewTextTemplateParser returns a new roulette format xml parser.
@@ -162,6 +174,14 @@ func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser
 		}
 	}
 
+	if config.LogLevel == "" {
+		config.LogLevel = "info"
+	}
+
+	if config.LogPath == "" {
+		config.LogPath = "stdout"
+	}
+
 	xmldata := XMLData{}
 
 	err := xml.Unmarshal(data, &xmldata)
@@ -173,6 +193,7 @@ func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser
 		config:       config,
 		defaultFuncs: defaultFuncMap,
 		xml:          xmldata,
+		buf:          newBufferPool(),
 	}
 
 	// compile rulesets
@@ -180,6 +201,8 @@ func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser
 	if err != nil {
 		return nil, err
 	}
+
+	log.Init(config.LogLevel, config.LogPath)
 
 	return parser, nil
 }

@@ -182,7 +182,8 @@ func TestRulesetWorflow(t *testing.T) {
 	for _, v := range workflowPatterns {
 		t21 := &T2{A: 1, B: 2}
 		config := TextTemplateParserConfig{
-			WorkflowPattern: v.workflowPattern,
+			WorkflowPattern:           v.workflowPattern,
+			IsWildcardWorkflowPattern: true,
 		}
 
 		parser, err := NewParser(readFile("testrules/rules_workflows.xml"), config)
@@ -204,7 +205,8 @@ func TestRulesetPriorites(t *testing.T) {
 
 	t21 := &T2{A: 1, B: 2}
 	config := TextTemplateParserConfig{
-		WorkflowPattern: "ruleset1",
+		WorkflowPattern:           "ruleset1",
+		IsWildcardWorkflowPattern: true,
 	}
 
 	parser, err := NewParser(readFile("testrules/rules_priorities.xml"), config)
@@ -220,7 +222,8 @@ func TestRulesetPriorites(t *testing.T) {
 	}
 
 	config = TextTemplateParserConfig{
-		WorkflowPattern: "ruleset2",
+		WorkflowPattern:           "ruleset2",
+		IsWildcardWorkflowPattern: true,
 	}
 
 	t22 := &T2{A: 1, B: 2}
