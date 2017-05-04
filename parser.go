@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"unicode"
 )
 
 // default delimeters
@@ -56,6 +57,16 @@ func (p *TextTemplateParser) compile() error {
 
 		if p.xml.Rulesets[i].DataKey == "" {
 			return fmt.Errorf("Missing required attribute dataKey")
+		}
+
+		for i, rune := range p.xml.Rulesets[i].FilterTypes {
+			if !unicode.IsLetter(rune) && i == 0 {
+				return fmt.Errorf("First character of filterTypes is not a letter")
+			}
+
+			if i == 0 {
+				break
+			}
 		}
 
 		// split filter types
@@ -147,7 +158,7 @@ func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser
 	} else {
 		err := validateFuncs(config.Userfuncs)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 	}
 

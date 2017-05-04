@@ -1,0 +1,4 @@
+<roulette>
+    <ruleset name="simpleParserTestRules" dataKey="TestData" filterTypes=".">
+    </ruleset>
+</roulette>

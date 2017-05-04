@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"testing"
+	"text/template"
 	"time"
 )
 
@@ -358,5 +359,167 @@ func TestPrimitives(t *testing.T) {
 		executor.Execute(v)
 
 	}
+
+}
+
+func TestMapValue(t *testing.T) {
+	m := map[string]interface{}{
+		"T2": &T2{A: 1, B: 2},
+	}
+
+	config := TextTemplateParserConfig{}
+
+	parser, err := NewParser(readFile("testrules/rules_map.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := NewSimpleExecutor(parser)
+	executor.Execute(m)
+
+}
+
+func TestFilterTypes(t *testing.T) {
+	t2 := &T2{A: 1, B: 2}
+
+	config := TextTemplateParserConfig{}
+
+	parser, err := NewParser(readFile("testrules/rules_filtertypes.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := NewSimpleExecutor(parser)
+	executor.Execute(t2)
+
+}
+
+func TestQueueParserClose(t *testing.T) {
+
+	in := make(chan interface{})
+	out := make(chan interface{})
+
+	config := TextTemplateParserConfig{
+		Result: NewResultQueue(),
+	}
+
+	parser, err := NewParser(readFile("testrules/rules_queue.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := NewQueueExecutor(parser)
+	executor.Execute(in, out)
+
+	//writer
+	go func(in chan interface{}, values []interface{}) {
+
+		for _, v := range values {
+			in <- v
+		}
+
+	}(in, testValuesQueue)
+
+	time.Sleep(time.Millisecond * 100)
+
+	close(in)
+	executor.CloseResult()
+
+}
+
+func TestRulesetRequiredAttr(t *testing.T) {
+	_, err := NewParser(readFile("testrules/rules_required_dataKey.xml"))
+	if err == nil {
+		log.Fatal(err)
+	}
+
+	_, err = NewParser(readFile("testrules/rules_required_filterTypes.xml"))
+	if err == nil {
+		log.Fatal(err)
+	}
+}
+
+func TestUserFuncs(t *testing.T) {
+	add := func(a, b int) int {
+		return a + b
+	}
+
+	count := 0
+	callback := func(vals interface{}) {
+		//fmt.Println(vals)
+		switch v := vals.(type) {
+		case int:
+			if v != 3 {
+				log.Fatalf("add user func not called")
+			}
+		}
+
+		count++
+	}
+
+	config := TextTemplateParserConfig{
+		Result: NewResultCallback(callback),
+		Userfuncs: template.FuncMap{
+			"add": add,
+		},
+	}
+
+	parser, err := NewParser(readFile("testrules/rules_userfuncs.xml"), config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	t2 := &T2{A: 1, B: 2}
+	executor := NewSimpleExecutor(parser)
+	executor.Execute(t2)
+	if count != 2 {
+		log.Fatalf("Expected 2 callbacks, got %d", count)
+	}
+
+	config = TextTemplateParserConfig{
+		Result: NewResultCallback(callback),
+		Userfuncs: template.FuncMap{
+			"_%f": add,
+		},
+	}
+
+	parser, err = NewParser(readFile("testrules/rules_userfuncs.xml"), config)
+	if err == nil {
+		log.Fatal(err)
+	}
+
+}
+
+func TestBadXML(t *testing.T) {
+	_, err := NewParser(readFile("testrules/rules_badxml.xml"))
+	if err == nil {
+		log.Fatal(err)
+	}
+
+}
+
+func TestBadFilterTypes(t *testing.T) {
+	_, err := NewParser(readFile("testrules/rules_bad_filterTypes.xml"))
+	if err == nil {
+		log.Fatal(err)
+	}
+
+}
+
+func TestBadPrioritiesCount(t *testing.T) {
+	_, err := NewParser(readFile("testrules/rules_bad_prioritiescount.xml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func TestNoValues(t *testing.T) {
+	parser, err := NewParser(readFile("testrules/rules_simple.xml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	executor := NewSimpleExecutor(parser)
+	executor.Execute()
 
 }

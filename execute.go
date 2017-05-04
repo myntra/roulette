@@ -1,6 +1,6 @@
 package roulette
 
-import "fmt"
+import "time"
 
 // SimpleExecute interface provides methods to retrieve a parser and a method which executes on the incoming values.
 type SimpleExecute interface {
@@ -10,6 +10,7 @@ type SimpleExecute interface {
 // QueueExecute interface provides methods to retrieve a parser and a method which executes on the incoming values on the input channel.
 type QueueExecute interface {
 	Execute(in <-chan interface{}, out chan<- interface{}) // in channel to write, out channel to read.
+	CloseResult()
 }
 
 // SimpleExecutor implements the SimpleExecute interface
@@ -77,7 +78,6 @@ recv:
 			v, ok := <-q.Parser.GetResult().Get().(chan interface{})
 			if !ok {
 				// in is closed, flush values
-				fmt.Println("result.get is closed")
 				break recv
 			}
 
@@ -114,6 +114,19 @@ recv:
 	// After in is closed, we may still have events to send
 	for _, v := range pending {
 		out <- v
+	}
+
+}
+
+// CloseResult closes the result channel
+func (q *QueueExecutor) CloseResult() {
+	q.Parser.GetResult().Get().(chan interface{}) <- quit{}
+	select {
+	case <-q.Parser.GetResult().Get().(chan interface{}):
+	case <-time.After(time.Millisecond * 10):
+		close(q.Parser.GetResult().Get().(chan interface{}))
+		break
+
 	}
 
 }

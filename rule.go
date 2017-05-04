@@ -43,14 +43,14 @@ func (r Rule) isValid(filterTypesArr []string) error {
 		return fmt.Errorf("rule expression contains result func but no type Result interface was set")
 	}
 
-	if !strings.Contains(r.Expr, r.config.resultKey) && r.config.resultAllowed {
-		return fmt.Errorf("rule expression does not contains result func but type Result interface was set")
-	}
-
 	err := fmt.Errorf("rule expression expected types %s, got %s", r.config.expectTypes, filterTypesArr)
 
 	if r.config.expectTypes == nil || filterTypesArr == nil {
 		return err
+	}
+
+	if len(filterTypesArr) == 1 && filterTypesArr[0] == "map[string]interface {}" {
+		return nil
 	}
 
 	// less
@@ -112,7 +112,7 @@ func (t TextTemplateRuleset) Less(i, j int) bool {
 
 func (t TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
 
-	if t.config.filterTypesArr == nil || filterTypesArr == nil {
+	if len(filterTypesArr) == 0 {
 		return false
 	}
 
@@ -144,13 +144,6 @@ func (t TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
 func getTypes(vals interface{}) []string {
 	var types []string
 	switch vals.(type) {
-	case map[string]interface{}:
-		for _, v := range vals.(map[string]interface{}) {
-			typeName := strings.Replace(reflect.TypeOf(v).String(), "*", "", -1)
-			types = append(types, typeName)
-		}
-
-		break
 	case []interface{}:
 		for _, v := range vals.([]interface{}) {
 			typeName := strings.Replace(reflect.TypeOf(v).String(), "*", "", -1)
@@ -179,9 +172,6 @@ func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interf
 	typeArrayIndex := make(map[string]int)
 
 	switch vals.(type) {
-	case map[string]interface{}:
-		valsData = vals.(map[string]interface{})
-		break
 	case []interface{}:
 		nestedMap := make(map[string]interface{})
 		for i, val := range vals.([]interface{}) {
@@ -194,10 +184,13 @@ func (t TextTemplateRuleset) getTemplateData(vals interface{}) map[string]interf
 
 				break
 
-			case map[string]int, map[string]string, map[string]bool, map[string]interface{}:
+			case map[string]int, map[string]string, map[string]bool:
 				replacer := strings.NewReplacer("[", "", "]", "", "{}", "")
 				typeName := replacer.Replace(reflect.TypeOf(val).String())
 				valsData[typeName+strconv.Itoa(i)] = val
+				break
+			case map[string]interface{}:
+				valsData = val.(map[string]interface{})
 				break
 
 			case bool, int, int32, int64, float32, float64:
@@ -281,7 +274,7 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 	types := getTypes(vals)
 	sort.Strings(types)
 	if !t.isValidForTypes(types...) {
-		log.Println("invalid types, skpping...", types)
+		log.Printf("invalid types %s skipping ruleset %s", types, t.Name)
 		return
 	}
 

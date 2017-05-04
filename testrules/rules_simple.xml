@@ -31,4 +31,73 @@
             <r>end</r>
         </rule>
     </ruleset>
+
+     <ruleset name="missingTypeResult" dataKey="TestData" resultKey="result" filterTypes="roulette.T1" 
+        filterStrict="false" prioritiesCount="all" >
+
+         <rule name="nilResult" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T1.SetA 5 | result.Put 10
+                    </r>
+                <r>end</r>
+        </rule>
+    </ruleset>
+
+    <ruleset name="lessFilterTypeSet" dataKey="TestData" resultKey="result" filterTypes="roulette.T1,roulette.T2" 
+        filterStrict="false" prioritiesCount="all" >
+
+         <rule name="nilResult" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T1.SetA 5 | .roulette.T2.SetA 10
+                    </r>
+                <r>end</r>
+        </rule>
+    </ruleset>
+
+    <ruleset name="incorrectTypeSet" dataKey="TestData" resultKey="result" filterTypes="roulette.T1" 
+        filterStrict="false" prioritiesCount="all" >
+
+         <rule name="incorrectType" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T2.SetA 5
+                    </r>
+                <r>end</r>
+        </rule>
+    </ruleset>
+
+
+    <ruleset name="filterTypesStrictSet" dataKey="TestData" resultKey="result" filterTypes="roulette.T1,roulette.T2" 
+        filterStrict="true" prioritiesCount="all" >
+
+         <rule name="filterTypesStrict" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T2.SetA 5
+                    </r>
+                <r>end</r>
+        </rule>
+
+        <rule name="filterTypesStrict" priority="1">
+            <r>with .TestData</r>
+                <r>
+                    .roulette.T2.SetA 5
+                </r>
+            <r>end</r>
+        </rule>
+    </ruleset>
+
+    <ruleset name="expectedTypesSet" dataKey="TestData" resultKey="result" filterTypes="roulette.T1,roulette.T2" 
+        filterStrict="true" prioritiesCount="all" >
+
+         <rule name="expectedTypesRule" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .roulette.T2.SetA 5
+                    </r>
+                <r>end</r>
+        </rule>
+    </ruleset>
 </roulette>

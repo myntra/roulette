@@ -1,0 +1,6 @@
+<roulette>
+    <ruleset name="badpriority" dataKey="TestData" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="bad">
+    </ruleset>
+
+</roulette>

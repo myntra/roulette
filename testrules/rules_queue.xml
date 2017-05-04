@@ -9,5 +9,13 @@
                 </r>
             <r>end</r>
         </rule>
+
+        <rule name="setA1not" priority="1">
+            <r>with .TestData</r>
+                <r>
+                    eq 1 2 | .result.Put .roulette.T2
+                </r>
+            <r>end</r>
+        </rule>
     </ruleset>
 </roulette>

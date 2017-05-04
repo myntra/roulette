@@ -2,7 +2,7 @@ package roulette
 
 // Result interface provides methods to get/put an interface{} value from a rule.
 type Result interface {
-	Put(val interface{}, prevVal bool) bool
+	Put(val interface{}, prevVal ...bool) bool
 	Get() interface{}
 }
 
@@ -12,9 +12,11 @@ type ResultCallback struct {
 }
 
 // Put receives a value and put's it on the parser's out channel
-func (q ResultCallback) Put(val interface{}, prevVal bool) bool {
-	if !prevVal {
-		return false
+func (q ResultCallback) Put(val interface{}, prevVal ...bool) bool {
+	if len(prevVal) > 0 {
+		if !prevVal[0] {
+			return false
+		}
 	}
 
 	q.fn(val)
@@ -37,11 +39,14 @@ type ResultQueue struct {
 }
 
 // Put receives a value and put's it on the parser's out channel
-func (q ResultQueue) Put(val interface{}, prevVal bool) bool {
+func (q ResultQueue) Put(val interface{}, prevVal ...bool) bool {
 	//fmt.Println(val, prevVal)
-	if !prevVal {
-		return false
+	if len(prevVal) > 0 {
+		if !prevVal[0] {
+			return false
+		}
 	}
+
 	go func(val interface{}) {
 		q.get <- val
 	}(val)
@@ -50,6 +55,7 @@ func (q ResultQueue) Put(val interface{}, prevVal bool) bool {
 }
 
 type empty struct{}
+type quit struct{}
 
 // Get ...
 func (q ResultQueue) Get() interface{} {
@@ -59,10 +65,19 @@ func (q ResultQueue) Get() interface{} {
 func (q ResultQueue) block() {
 	// nil channel blocks forever
 	//	blocks := make(chan interface{})
+block:
 	for {
 		select {
-		case q.get <- empty{}:
+		case v := <-q.get:
+			switch v.(type) {
+			case quit:
+				break block
+			default:
+				// is not quit, put it back
+				q.get <- v
+			}
 
+		case q.get <- empty{}:
 		}
 	}
 }

@@ -1,0 +1,16 @@
+<roulette>
+
+    <ruleset name="userfuncset" dataKey="TestData" filterTypes="roulette.T2" 
+        filterStrict="false" prioritiesCount="all" >
+
+         <rule name="userfuncrule" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                        .result.Put (add 1 2) |
+                        .result.Put .roulette.T2
+                    </r>
+                <r>end</r>
+        </rule>
+    <!--</ruleset>-->
+
+</roulette>

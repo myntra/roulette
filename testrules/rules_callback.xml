@@ -18,4 +18,17 @@
             <r>end</r>
         </rule>
     </ruleset>
+
+    <ruleset name="emptyResultKeySet" dataKey="TestData" filterTypes="roulette.T2" 
+        filterStrict="true" prioritiesCount="all" >
+
+         <rule name="emptyResultKeyRule" priority="1">
+                <r>with .TestData</r>
+                    <r>
+                       .roulette.T2.SetA 10 | .result.Put .roulette.T2
+                    </r>
+                <r>end</r>
+        </rule>
+    </ruleset>
+
 </roulette>
