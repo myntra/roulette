@@ -274,7 +274,7 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 	}
 
 	types := t.getTypes(vals)
-	sort.Strings(types)
+
 	if !t.isValidForTypes(types...) {
 		//	log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
 		return
