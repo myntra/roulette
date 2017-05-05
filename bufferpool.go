@@ -56,26 +56,3 @@ func (pool *mapPool) putReset(buffer map[string]interface{}) {
 	}
 	pool.sp.Put(buffer)
 }
-
-// wrapper over a []string pool
-type stringSlicePool struct {
-	sp sync.Pool
-}
-
-func newStringSlicePool() *stringSlicePool {
-	return &stringSlicePool{
-		sp: sync.Pool{
-			New: func() interface{} {
-				return []string{}
-			},
-		},
-	}
-}
-
-func (pool *stringSlicePool) get() []string {
-	return pool.sp.Get().([]string)
-}
-func (pool *stringSlicePool) put(buffer []string) {
-	//	buffer = buffer[:0]
-	pool.sp.Put(buffer)
-}

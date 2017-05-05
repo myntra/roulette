@@ -114,11 +114,12 @@ type TextTemplateRuleset struct {
 	Rules           []Rule `xml:"rule"`
 	PrioritiesCount string `xml:"prioritiesCount,attr"`
 	Workflow        string `xml:"workflow,attr"`
-	config          textTemplateRulesetConfig
-	bytesBuf        *bytesPool
-	mapBuf          *mapPool
-	sameTypeIndex   map[int]string
-	limit           int
+
+	config        textTemplateRulesetConfig
+	bytesBuf      *bytesPool
+	mapBuf        *mapPool
+	sameTypeIndex map[int]string
+	limit         int
 }
 
 // sort rules by priority
@@ -209,6 +210,9 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 		nestedMap := t.mapBuf.get()
 		defer t.mapBuf.put(nestedMap)
 
+		indexPkgTypeName := t.bytesBuf.get()
+		defer t.bytesBuf.put(indexPkgTypeName)
+
 		for i, val := range vals.([]interface{}) {
 
 			switch val.(type) {
@@ -250,9 +254,6 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 					typeName = reflect.TypeOf(val).String()
 				}
 
-				indexPkgTypeName := t.bytesBuf.get()
-				defer t.bytesBuf.put(indexPkgTypeName)
-
 				indexPkgTypeName.WriteString(typeName)
 
 				_, ok := typeArrayIndex[typeName]
@@ -271,9 +272,12 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 				}
 
 				indexPkgTypeName.WriteString(nextIndex)
+				key := indexPkgTypeName.String()
 
-				nestedMap[indexPkgTypeName.String()] = val
+				nestedMap[key] = val
 				valsData[pkgPath] = nestedMap
+
+				indexPkgTypeName.Reset()
 			}
 
 		}
@@ -318,8 +322,8 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 
 	successCount := 0
 
-	for _, rule := range t.Rules {
-
+	for i := range t.Rules {
+		rule := t.Rules[i]
 		if rule.config.noResultFunc {
 			//log.Warnf("rule expression contains result func but no type Result interface was set %s", rule.Name)
 			continue
