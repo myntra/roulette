@@ -17,6 +17,14 @@ import (
 var delimLeft = "<r>"
 var delimRight = "</r>"
 
+var defaultSameTypeIndex = map[int]string{
+	1: "1",
+	2: "2",
+	3: "3",
+	4: "4",
+	5: "5",
+}
+
 // Parser interface provides methods for the executor to update the tree, execute the values and get result.
 type Parser interface {
 	Execute(vals interface{})
@@ -31,11 +39,12 @@ type XMLData struct {
 
 // TextTemplateParser holds the rules from a rule file
 type TextTemplateParser struct {
-	xml          XMLData
-	config       TextTemplateParserConfig
-	defaultFuncs template.FuncMap
-	bytesBuf     *bytesPool
-	mapBuf       *mapPool
+	xml           XMLData
+	config        TextTemplateParserConfig
+	defaultFuncs  template.FuncMap
+	bytesBuf      *bytesPool
+	mapBuf        *mapPool
+	sameTypeIndex map[int]string
 }
 
 // Execute executes the parser's rulesets
@@ -79,6 +88,7 @@ func (p *TextTemplateParser) compile() error {
 		// assign buffer pool
 		p.xml.Rulesets[i].bytesBuf = p.bytesBuf
 		p.xml.Rulesets[i].mapBuf = p.mapBuf
+		p.xml.Rulesets[i].sameTypeIndex = p.sameTypeIndex
 
 		// limit
 		if p.xml.Rulesets[i].PrioritiesCount == "all" || p.xml.Rulesets[i].PrioritiesCount == "" {
@@ -236,11 +246,12 @@ func NewTextTemplateParser(data []byte, config TextTemplateParserConfig) (Parser
 	}
 
 	parser := TextTemplateParser{
-		config:       config,
-		defaultFuncs: defaultFuncMap,
-		xml:          xmldata,
-		bytesBuf:     newBytesPool(),
-		mapBuf:       newMapPool(),
+		config:        config,
+		defaultFuncs:  defaultFuncMap,
+		xml:           xmldata,
+		bytesBuf:      newBytesPool(),
+		mapBuf:        newMapPool(),
+		sameTypeIndex: defaultSameTypeIndex,
 	}
 
 	// compile rulesets

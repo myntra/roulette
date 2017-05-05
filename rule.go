@@ -36,36 +36,61 @@ type Rule struct {
 	config   ruleConfig
 }
 
-func (r Rule) isValid(filterTypesArr []string) error {
+func (r Rule) hasType(typeName string) bool {
+	j := sort.SearchStrings(r.config.expectTypes, typeName)
+	return j < len(r.config.expectTypes) && r.config.expectTypes[j] == typeName
+}
 
-	if r.config.expectTypes == nil || filterTypesArr == nil {
+func (r Rule) isValid(vals interface{}) error {
+
+	if r.config.expectTypes == nil || vals == nil {
 		return r.config.expectTypesErr
 	}
 
-	if len(filterTypesArr) == 1 && filterTypesArr[0] == "map[string]interface {}" {
-		return nil
-	}
+	switch vals.(type) {
+	case []interface{}:
+		var typeName string
+		typedVals := vals.([]interface{})
+		size := len(typedVals)
 
-	// less
-	if len(filterTypesArr) < len(r.config.expectTypes) {
-		return r.config.expectTypesErr
-	}
-
-	// equal to
-	if len(filterTypesArr) == len(r.config.expectTypes) {
-		for i := range r.config.expectTypes {
-			if filterTypesArr[i] != r.config.expectTypes[i] {
-				return r.config.expectTypesErr
-			}
+		if size == 0 || len(r.config.expectTypes) == 0 {
+			return r.config.expectTypesErr
 		}
-	}
 
-	// greater than
-	// all expected types should be present in the template data.
-	for _, expectedType := range r.config.expectTypes {
-		j := sort.SearchStrings(filterTypesArr, expectedType)
-		found := j < len(filterTypesArr) && filterTypesArr[j] == expectedType
-		if !found {
+		if size == 1 && typedVals[0] == "map[string]interface {}" {
+			return nil
+		}
+
+		if size < len(r.config.expectTypes) {
+			return r.config.expectTypesErr
+		}
+
+		foundCount := 0
+		for _, v := range typedVals {
+			if reflect.ValueOf(v).Kind() == reflect.Ptr || reflect.ValueOf(v).Kind() == reflect.Interface {
+				typeName = reflect.TypeOf(v).Elem().String()
+			} else {
+				typeName = reflect.TypeOf(v).String()
+			}
+
+			if foundCount == len(r.config.expectTypes) {
+				return nil
+			}
+
+			if r.hasType(typeName) {
+				foundCount++
+			}
+
+		}
+
+		if foundCount != len(r.config.expectTypes) {
+			return r.config.expectTypesErr
+		}
+
+	default:
+		typeName := reflect.TypeOf(vals).Elem().String()
+		hasType := r.hasType(typeName)
+		if !hasType {
 			return r.config.expectTypesErr
 		}
 	}
@@ -92,6 +117,7 @@ type TextTemplateRuleset struct {
 	config          textTemplateRulesetConfig
 	bytesBuf        *bytesPool
 	mapBuf          *mapPool
+	sameTypeIndex   map[int]string
 	limit           int
 }
 
@@ -106,63 +132,65 @@ func (t TextTemplateRuleset) Less(i, j int) bool {
 	return t.Rules[i].Priority < t.Rules[j].Priority
 }
 
-func (t TextTemplateRuleset) isValidForTypes(filterTypesArr ...string) bool {
+func (t TextTemplateRuleset) isValid(vals interface{}) bool {
 
-	if len(filterTypesArr) == 0 {
-		return false
-	}
-
-	if len(t.config.filterTypesArr) != len(filterTypesArr) && t.FilterStrict {
-		return false
-	}
-
-	// if not filterStrict, look for atleast one match
-	// if filterStrict look for atleast one mismatch
-	for i, v := range t.config.filterTypesArr {
-		j := sort.SearchStrings(t.config.filterTypesArr, v)
-		found := j < len(t.config.filterTypesArr) && t.config.filterTypesArr[i] == v
-		if !found {
-			if t.FilterStrict {
-				return false
-			}
-		} else {
-
-			// filtering is not strict and one atleast one match found.
-			if !t.FilterStrict {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (t TextTemplateRuleset) getTypes(vals interface{}) []string {
-	var types []string
 	switch vals.(type) {
 	case []interface{}:
 		var typeName string
-		size := len(vals.([]interface{}))
-		types = make([]string, size)
-		for i, v := range vals.([]interface{}) {
+		typedVals := vals.([]interface{})
+		size := len(typedVals)
+
+		if size == 0 || len(t.config.filterTypesArr) == 0 {
+			return false
+		}
+
+		if t.FilterStrict {
+			if len(t.config.filterTypesArr) != size {
+				return false
+			}
+		}
+
+		for _, v := range vals.([]interface{}) {
 			if reflect.ValueOf(v).Kind() == reflect.Ptr || reflect.ValueOf(v).Kind() == reflect.Interface {
 				typeName = reflect.TypeOf(v).Elem().String()
 			} else {
 				typeName = reflect.TypeOf(v).String()
 			}
 
-			types[i] = typeName
+			hasType := t.hasType(typeName)
+
+			if t.FilterStrict && !hasType {
+				return false
+			}
+
+			if !t.FilterStrict && hasType {
+				return true
+			}
+
 		}
 
 		break
 
 	default:
-		types = make([]string, 1)
+
 		typeName := reflect.TypeOf(vals).Elem().String()
-		types[0] = typeName
+		hasType := t.hasType(typeName)
+		if t.FilterStrict && !hasType {
+			return false
+		}
+
+		if !t.FilterStrict && hasType {
+			return true
+		}
+
 	}
 
-	return types
+	return false
+}
+
+func (t TextTemplateRuleset) hasType(typeName string) bool {
+	j := sort.SearchStrings(t.config.filterTypesArr, typeName)
+	return j < len(t.config.filterTypesArr) && t.config.filterTypesArr[j] == typeName
 }
 
 func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, vals interface{}) {
@@ -175,7 +203,6 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 	defer t.mapBuf.put(valsData)
 	// index array of same types
 	typeArrayIndex := make(map[string]int)
-	var pkgPaths []string
 
 	switch vals.(type) {
 	case []interface{}:
@@ -209,52 +236,58 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 				break
 
 			default:
+
+				var pkgPath string
 				var typeName string
+
 				if reflect.ValueOf(val).Kind() == reflect.Ptr || reflect.ValueOf(val).Kind() == reflect.Interface {
-					typeName = reflect.TypeOf(val).Elem().String()
+					pkgTypeName := reflect.TypeOf(val).Elem().String()
+					periodIndex := strings.Index(pkgTypeName, ".")
+					typeName = pkgTypeName[periodIndex+1:]
+					pkgPath = pkgTypeName[:periodIndex]
+
 				} else {
 					typeName = reflect.TypeOf(val).String()
 				}
 
-				var pkgTypeName string
-				if reflect.TypeOf(val).PkgPath() != "" {
-					pkgTypeName = reflect.TypeOf(val).PkgPath()
-				} else {
-					pkgPaths = strings.Split(typeName, ".")
-					pkgTypeName = pkgPaths[len(pkgPaths)-1]
-				}
+				indexPkgTypeName := t.bytesBuf.get()
+				defer t.bytesBuf.put(indexPkgTypeName)
 
-				indexPkgTypeName := pkgTypeName
+				indexPkgTypeName.WriteString(typeName)
 
-				_, ok := typeArrayIndex[pkgTypeName]
+				_, ok := typeArrayIndex[typeName]
 				if !ok {
-					typeArrayIndex[pkgTypeName] = 0
-					nestedMap[pkgTypeName] = val
+					typeArrayIndex[typeName] = 0
+					nestedMap[typeName] = val
 
 				} else {
-					typeArrayIndex[pkgTypeName]++
+					typeArrayIndex[typeName]++
 				}
 
-				indexPkgTypeName = pkgTypeName + strconv.Itoa(typeArrayIndex[pkgTypeName])
-				nestedMap[indexPkgTypeName] = val
-
-				packagePath := ""
-				for _, p := range pkgPaths[:len(pkgPaths)-1] {
-					packagePath = packagePath + p
+				nextIndex, ok := t.sameTypeIndex[typeArrayIndex[typeName]]
+				if !ok {
+					nextIndex = strconv.Itoa(typeArrayIndex[typeName])
+					t.sameTypeIndex[typeArrayIndex[typeName]] = nextIndex
 				}
-				//	fmt.Println("packagePath", packagePath)
-				valsData[packagePath] = nestedMap
+
+				indexPkgTypeName.WriteString(nextIndex)
+
+				nestedMap[indexPkgTypeName.String()] = val
+				valsData[pkgPath] = nestedMap
 			}
 
 		}
 
 		break
 	default:
-		typeName := reflect.TypeOf(vals).Elem().String()
-		pkgPaths = strings.Split(typeName, ".")
+		pkgTypeName := reflect.TypeOf(vals).Elem().String()
+		periodIndex := strings.Index(pkgTypeName, ".")
+		typeName := pkgTypeName[periodIndex+1:]
+		pkgPath := pkgTypeName[:periodIndex]
+
 		//fmt.Println("default", pkgPaths)
-		valsData[pkgPaths[0]] = map[string]interface{}{
-			pkgPaths[1]: vals,
+		valsData[pkgPath] = map[string]interface{}{
+			typeName: vals,
 		}
 	}
 
@@ -273,16 +306,11 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 		return
 	}
 
-	types := t.getTypes(vals)
-
-	if !t.isValidForTypes(types...) {
+	if !t.isValid(vals) {
 		//	log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
 		return
 	}
 
-	defer func() {
-		types = types[:0]
-	}()
 	//	fmt.Println("types:", types)
 	tmplData := t.mapBuf.get()
 	defer t.mapBuf.put(tmplData)
@@ -298,7 +326,7 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 		}
 
 		// validate if one of the types exist in the expression.
-		err := rule.isValid(types)
+		err := rule.isValid(vals)
 		if err != nil {
 			//	log.Warnf("invalid rule %s, error: %v", rule.Name, err)
 			continue
