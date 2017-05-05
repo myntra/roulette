@@ -280,8 +280,9 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 		return
 	}
 
-	types = types[:0]
-
+	defer func() {
+		types = types[:0]
+	}()
 	//	fmt.Println("types:", types)
 	tmplData := t.mapBuf.get()
 	defer t.mapBuf.put(tmplData)
