@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/Masterminds/sprig"
 	"github.com/myntra/roulette/log"
 )
 
@@ -180,6 +181,13 @@ func (p *TextTemplateParser) compile() error {
 			for k, v := range p.xml.Rulesets[i].Rules[j].config.defaultfuncs {
 				p.xml.Rulesets[i].Rules[j].config.allfuncs[k] = v
 			}
+
+			// append Masterminds/sprig funcs
+
+			for k, v := range sprig.FuncMap() {
+				p.xml.Rulesets[i].Rules[j].config.allfuncs[k] = v
+			}
+
 			for k, v := range p.xml.Rulesets[i].Rules[j].config.userfuncs {
 				p.xml.Rulesets[i].Rules[j].config.allfuncs[k] = v
 			}

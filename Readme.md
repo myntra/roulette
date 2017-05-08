@@ -37,7 +37,6 @@
             - [SimpleExecutor with Callback](#simpleexecutor-with-callback)
         - [QueueExecutor](#queueexecutor)
 - [Builtin Functions](#builtin-functions)
-- [TODO](#todo)
 - [Attributions](#attributions)
 
 <!-- /TOC -->
@@ -428,13 +427,7 @@ The idea is to keep the templating language readable and easy to write.
 
  - pipe operator | : `Usage: the output of fn1 is the last argument of fn2`, e.g. `fn1 1 2| fn2 1 2 `
 
-
-## TODO
-- Log levels
-- More builtin functions.
-- More tests.
-- More examples: roulette templates and go code.
-- Static checker(?).
+The functions from the excellent package [sprig](http://masterminds.github.io/sprig/) are also available.
 
 ## Attributions
 The `roulette.png` image is sourced from https://thenounproject.com/term/roulette/143243/ with a CC license.
