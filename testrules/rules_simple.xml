@@ -5,7 +5,16 @@
         <rule name="setA" priority="1">
                 <r>with .TestData</r>
                     <r>
-                        .roulette.T1.SetA 5
+                     $aval := (not true)
+                    </r>
+                    <r>
+                     $bval := true
+                    </r>
+                     <r>
+                     $fval := not false
+                    </r>
+                    <r>
+                       not $aval | eq $bval true | ($fval) | .roulette.T1.SetA 5
                     </r>
                 <r>end</r>
         </rule>

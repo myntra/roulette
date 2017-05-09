@@ -3,7 +3,9 @@ package roulette
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
+	"strconv"
 	"text/template"
 	"unicode"
 )
@@ -387,16 +389,81 @@ func validateFuncs(funcMap template.FuncMap) error {
 	return nil
 }
 
+// remove when the below functions are added to spring
+
+// toFloat64 converts 64-bit floats
+func toFloat64(v interface{}) float64 {
+	if str, ok := v.(string); ok {
+		iv, err := strconv.ParseFloat(str, 64)
+		if err != nil {
+			return 0
+		}
+		return iv
+	}
+
+	val := reflect.Indirect(reflect.ValueOf(v))
+	switch val.Kind() {
+	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int:
+		return float64(val.Int())
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32:
+		return float64(val.Uint())
+	case reflect.Uint, reflect.Uint64:
+		return float64(val.Uint())
+	case reflect.Float32, reflect.Float64:
+		return val.Float()
+	case reflect.Bool:
+		if val.Bool() == true {
+			return 1
+		}
+		return 0
+	default:
+		return 0
+	}
+}
+
+func floor(a interface{}) float64 {
+	aa := toFloat64(a)
+	return math.Floor(aa)
+}
+
+func ceil(a interface{}) float64 {
+	aa := toFloat64(a)
+	return math.Ceil(aa)
+}
+
+func round(a interface{}, p int, r_opt ...float64) float64 {
+	roundOn := .5
+	if len(r_opt) > 0 {
+		roundOn = r_opt[0]
+	}
+	val := toFloat64(a)
+	places := toFloat64(p)
+
+	var round float64
+	pow := math.Pow(10, places)
+	digit := pow * val
+	_, div := math.Modf(digit)
+	if div >= roundOn {
+		round = math.Ceil(digit)
+	} else {
+		round = math.Floor(digit)
+	}
+	return round / pow
+}
+
 var defaultFuncMap = template.FuncMap{
 	"in": within,
 	// Comparisons
-	"eq":  eq, // ==
-	"ge":  ge, // >=
-	"gt":  gt, // >
-	"le":  le, // <=
-	"lt":  lt, // <
-	"ne":  ne, // !=
-	"not": not,
-	"and": and,
-	"or":  or,
+	"eq":    eq, // ==
+	"ge":    ge, // >=
+	"gt":    gt, // >
+	"le":    le, // <=
+	"lt":    lt, // <
+	"ne":    ne, // !=
+	"not":   not,
+	"and":   and,
+	"or":    or,
+	"ceil":  ceil,
+	"floor": floor,
+	"round": round,
 }

@@ -129,7 +129,7 @@ func (q *QueueExecutor) CloseResult() {
 
 	}
 
-}
+}	
 
 // NewSimpleExecutor returns a new SimpleExecutor
 func NewSimpleExecutor(parser Parser) SimpleExecute {
