@@ -50,8 +50,13 @@ type TextTemplateParser struct {
 
 // Execute executes the parser's rulesets
 func (p TextTemplateParser) Execute(vals interface{}) {
+	var err error
 	for i := range p.xml.Rulesets {
-		p.xml.Rulesets[i].Execute(vals)
+		err = p.xml.Rulesets[i].Execute(vals)
+		if err != nil {
+			log.Warn(err)
+		}
+
 	}
 }
 

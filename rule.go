@@ -1,6 +1,7 @@
 package roulette
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 
 // Ruleset ...
 type Ruleset interface {
-	Execute(vals interface{})
+	Execute(vals interface{}) error
 }
 
 type ruleConfig struct {
@@ -303,16 +304,16 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 }
 
 // Execute ...
-func (t TextTemplateRuleset) Execute(vals interface{}) {
+func (t TextTemplateRuleset) Execute(vals interface{}) error {
 
 	if !t.config.workflowMatch {
 		//log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow)
-		return
+		return fmt.Errorf("ruleset %s is not valid for the current parser %s", t.Name, t.Workflow)
 	}
 
 	if !t.isValid(vals) {
 		//	log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
-		return
+		return fmt.Errorf("invalid types %s skipping ruleset", t.Name)
 	}
 
 	//	fmt.Println("types:", types)
@@ -371,4 +372,6 @@ func (t TextTemplateRuleset) Execute(vals interface{}) {
 		}
 
 	}
+
+	return nil
 }
