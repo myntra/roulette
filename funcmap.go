@@ -211,6 +211,7 @@ func ne(arg1, arg2 reflect.Value, arg3 ...reflect.Value) (bool, error) {
 
 // lt evaluates the comparison a < b.
 func lt(arg1, arg2 reflect.Value, arg3 ...reflect.Value) (bool, error) {
+	//fmt.Println("lt", arg1, arg2)
 	if len(arg3) > 0 {
 		if !truth(arg3[0]) {
 			return false, nil
@@ -254,6 +255,8 @@ func lt(arg1, arg2 reflect.Value, arg3 ...reflect.Value) (bool, error) {
 			panic("invalid kind")
 		}
 	}
+
+	//fmt.Println("lt", truth)
 	return truth, nil
 }
 
@@ -300,6 +303,7 @@ func ge(arg1, arg2 reflect.Value, arg3 ...reflect.Value) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return !lessThan, nil
 }
 
@@ -329,7 +333,7 @@ func and(arg0 reflect.Value, args ...reflect.Value) (bool, error) {
 }
 
 func or(arg0, arg1 reflect.Value, args ...reflect.Value) (bool, error) {
-
+	//fmt.Println("or ", truth(arg0), truth(arg1))
 	for i := range args {
 		prevArg := args[i]
 		if !truth(prevArg) {
@@ -367,6 +371,14 @@ func within(arg1, arg2, arg3 reflect.Value, arg4 ...reflect.Value) (bool, error)
 	}
 
 	return greaterOrEqual && lessOrEqual, nil
+}
+
+// ternary operator
+func tern(cond bool, t, f interface{}) interface{} {
+	if cond {
+		return t
+	}
+	return f
 }
 
 // validateFuncs validates additional functions to be added to the parser
@@ -463,6 +475,7 @@ var defaultFuncMap = template.FuncMap{
 	"not":   not,
 	"and":   and,
 	"or":    or,
+	"tern":  tern,
 	"ceil":  ceil,
 	"floor": floor,
 	"round": round,

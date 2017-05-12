@@ -279,8 +279,8 @@ func TestCallbackParser(t *testing.T) {
 
 	executor := NewSimpleExecutor(parser)
 	executor.Execute(testValuesQueue...)
-	if count != 2 {
-		log.Fatalf("Expected 2 callbacks, got %d", count)
+	if count != 3 {
+		log.Fatalf("Expected 3 callbacks, got %d", count)
 	}
 
 }

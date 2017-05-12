@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 )
 
@@ -147,7 +148,7 @@ func (t TextTemplateRuleset) isValid(vals interface{}) bool {
 		}
 
 		if t.FilterStrict {
-			if len(t.config.filterTypesArr) != size {
+			if size < len(t.config.filterTypesArr) {
 				return false
 			}
 		}
@@ -165,7 +166,7 @@ func (t TextTemplateRuleset) isValid(vals interface{}) bool {
 				return false
 			}
 
-			if !t.FilterStrict && hasType {
+			if hasType {
 				return true
 			}
 
@@ -181,7 +182,7 @@ func (t TextTemplateRuleset) isValid(vals interface{}) bool {
 			return false
 		}
 
-		if !t.FilterStrict && hasType {
+		if hasType {
 			return true
 		}
 
@@ -195,7 +196,25 @@ func (t TextTemplateRuleset) hasType(typeName string) bool {
 	return j < len(t.config.filterTypesArr) && t.config.filterTypesArr[j] == typeName
 }
 
-func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, vals interface{}) {
+type templateData struct {
+	sync.RWMutex
+	data map[string]interface{}
+}
+
+func (td *templateData) Get(key string) interface{} {
+	td.RLock()
+	defer td.RUnlock()
+	return td.data[key]
+}
+
+func (td *templateData) Set(key string, val interface{}) bool {
+	td.Lock()
+	defer td.Unlock()
+	td.data[key] = val
+	return true
+}
+
+func (t TextTemplateRuleset) getTemplateData(tmplData, userTmplData map[string]interface{}, vals interface{}) {
 
 	//fmt.Println("getTemplateData", reflect.TypeOf(vals))
 	// flatten multiple types in template map so that they can be referred by
@@ -297,48 +316,60 @@ func (t TextTemplateRuleset) getTemplateData(tmplData map[string]interface{}, va
 	}
 
 	valsData[t.ResultKey] = t.config.result
+
+	templateData := &templateData{data: userTmplData}
+	valsData["R"] = templateData
 	tmplData[t.DataKey] = valsData
 
 	//fmt.Println("map", tmplData)
 
 }
 
+var mutex = &sync.RWMutex{}
+
 // Execute ...
 func (t TextTemplateRuleset) Execute(vals interface{}) error {
 
 	if !t.config.workflowMatch {
-		//log.Warnf("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow)
+		//log.Infof("ruleset %s is not valid for the current parser %s %s", t.Name, t.Workflow)
 		return fmt.Errorf("ruleset %s is not valid for the current parser %s", t.Name, t.Workflow)
 	}
 
 	if !t.isValid(vals) {
-		//	log.Warnf("invalid types %s skipping ruleset %s", types, t.Name)
+		//	//log.Infof("invalid types %s skipping ruleset %s", types, t.Name)
 		return fmt.Errorf("invalid types %s skipping ruleset", t.Name)
 	}
 
+	mutex.Lock()
+	defer mutex.Unlock()
 	//	fmt.Println("types:", types)
 	tmplData := t.mapBuf.get()
+	userTmplData := t.mapBuf.get()
 	defer t.mapBuf.put(tmplData)
-	t.getTemplateData(tmplData, vals)
+	defer t.mapBuf.put(userTmplData)
+	t.getTemplateData(tmplData, userTmplData, vals)
 
 	successCount := 0
 
 	for i := range t.Rules {
+
 		rule := t.Rules[i]
+
+		////log.Infof("rule  %s", rule.Name)
 		if rule.config.noResultFunc {
-			//log.Warnf("rule expression contains result func but no type Result interface was set %s", rule.Name)
+			//log.Infof("rule expression contains result func but no type Result interface was set %s", rule.Name)
 			continue
 		}
 
 		// validate if one of the types exist in the expression.
 		err := rule.isValid(vals)
 		if err != nil {
-			//	log.Warnf("invalid rule %s, error: %v", rule.Name, err)
+			//log.Infof("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
 
 		if rule.config.templateErr != nil {
-			//	log.Warnf("invalid rule %s, error: %v", rule.Name, rule.config.templateErr)
+			//log.Infof("invalid rule %s, error: %v", rule.Name, rule.config.templateErr)
 			continue
 		}
 
@@ -347,11 +378,9 @@ func (t TextTemplateRuleset) Execute(vals interface{}) error {
 
 		err = rule.config.template.Execute(buf, tmplData)
 		if err != nil {
-			//	log.Warnf("invalid rule %s, error: %v", rule.Name, err)
+			//log.Infof("invalid rule %s, error: %v", rule.Name, err)
 			continue
 		}
-
-		//log.Infof("matched rule %s", rule.Name)
 
 		var result bool
 
@@ -359,16 +388,19 @@ func (t TextTemplateRuleset) Execute(vals interface{}) error {
 
 		result, err = strconv.ParseBool(res)
 		if err != nil {
-			//log.Warnf("parse result error", err)
+			////log.Infof("parse result error", err)
 			continue
 		}
 
 		// n high priority rules successful, break
 		if result {
+			//log.Infof("rule passed %s", rule.Name)
 			successCount++
 			if successCount == t.limit {
 				break
 			}
+		} else {
+			//log.Infof("rule failed %s", rule.Name)
 		}
 
 	}
