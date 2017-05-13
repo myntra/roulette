@@ -1,0 +1,49 @@
+<roulette>
+    <ruleset name="person_yearly_review_rules" dataKey="MyData"  filterTypes="types.Person"
+     filterStrict="true">
+        <rule name="person_perfscore">
+            
+             <r> define "promote"</r>
+                <r>with .MyData</r>
+                    <r>     
+                         eq .types.Person.Designation (.R.Get "currRole") |
+                         ge .types.Person.PerfScore (.R.Get "promoteScore") |
+                        .result.Put (promoteEmployee (.R.Get "promotedRole") .types.Person.ID)        
+                    </r>
+                <r>end</r>
+             <r>end</r>
+
+             <r> define "demote"</r>
+                 <r>with .MyData</r>
+                         eq .types.Person.Designation (.R.Get "currRole") |
+                         le .types.Person.PerfScore (.R.Get "demoteScore") |
+                        .result.Put (demoteEmployee "demotedRole" .types.Person.ID)
+                    </r>
+                <r>end</r>
+            <r>end</r>
+
+             <r> define "check" </r>
+                <r> template "promote" .</r>
+                <r> template "demote .</r>
+            <r>end</r>
+
+
+            <r> .MyData.R.Set "currRole" "SSE" </r>
+            <r> .MyData.R.Set "promoteScore" 3.5 </r>
+            <r> .MyData.R.Set "demoteScore" 1.5 </r>
+            <r> .MyData.R.Set "promotedRole" "PE" </r>
+            <r> .MyData.R.Set "demotedRole" "SE" </r>
+            <r> template "check" .</r> 
+
+
+            <r> .MyData.R.Set "currRole" "AA" </r>
+            <r> .MyData.R.Set "promoteScore" 4.5 </r>
+            <r> .MyData.R.Set "demoteScore" 1.5 </r>
+            <r> .MyData.R.Set "promotedRole" "SA" </r>
+            <r> .MyData.R.Set "demotedRole" "SSE" </r>
+            <r> template "check" .</r> 
+          
+
+        </rule>
+    </ruleset>
+</roulette>
